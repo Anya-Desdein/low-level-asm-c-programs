@@ -22,6 +22,18 @@ int main() {
 	printf("c: %s\n", (c == normalpt) ? "true" : "false");
 	printf("d: %s\n", (d == normalpt) ? "true" : "false");
 	printf("e: %s\n", (e == normalpt) ? "true" : "false");
+
+
+	printf("Compare null pointers: %s\n", (a == b) ? "true" : "false");
+	printf("%s\n", (a == c) ? "true" : "false");
+	printf("%s\n", (a == d) ? "true" : "false");
+	printf("%s\n", (a == e) ? "true" : "false");
+	printf("%s\n", (b == c) ? "true" : "false");
+	printf("%s\n", (b == d) ? "true" : "false");
+	printf("%s\n", (b == e) ? "true" : "false");
+	printf("%s\n", (c == d) ? "true" : "false");
+	printf("%s\n", (c == e) ? "true" : "false");
+	printf("%s\n", (d == e) ? "true" : "false");
 	return 0;
 }
 
