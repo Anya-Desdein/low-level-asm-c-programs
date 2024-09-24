@@ -1,3 +1,11 @@
+; This code is for looping over CPU Identification
+; 
+;
+; Now look at the bear
+; He's very cute ^^
+; ʕ·͡ᴥ͡͡·ʔ <---------- This wasn't copy pasted...
+
+
 section .bss
 	cpudata resb 12 ; reserve 12 bytes
 
