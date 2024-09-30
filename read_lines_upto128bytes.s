@@ -7,9 +7,8 @@ section .data
 	char db 0xa
 	iter dd 0
 	counter dd 0
-	tomod dd 10
 	ascii times 32 db 0
-	iter_str db 31
+	_chars_printed dq 0
 
 section .text
 	global _start;
@@ -41,7 +40,10 @@ skip_incr_newl:
 	jmp _loop	
 	
 _endmepls:	
-	jmp asciinator
+	xor r10, r10
+	xor r13, r13
+	mov r12, [counter]
+	call _asciinator
 _end:	
 	mov rsi, ascii
 	call print
@@ -86,20 +88,56 @@ incr_newl:
 	mov [counter], r12d
 	ret
 
-asciinator:
-	mov eax, [counter]
-	mov r13d, [tomod] ; divisor, lower 32 bits
-	xor edx, edx ; divisor, upper 32 bits
-	div r13d
-	mov [counter], eax
-
-	add edx, '0'
+; _asciinator requires:
+; r10 for iterator, r13 for reverse iterator
+; _chars_printed for printing ascii
+; r12 should hold the value you'd like to turn into ascii
+_asciinator:
+	xor rdx, rdx
+	mov rax, r12
+	mov rbx, 10
+	div rbx
 	
-	mov dil, [iter_str]
-	movzx rdi, dil
-	mov byte [rdi + ascii], dl	
-	sub dword [iter_str], 1
+	mov r12, rax
 
-	cmp eax, 0
-	jne asciinator
-	jmp _end
+	add rdx, '0'
+	mov [_chars_printed + r10], rdx
+	inc r10
+
+	cmp rax, 0
+	jne _asciinator	
+	
+	mov r9, r10
+	xor r11, r11
+	xor r8, r8	
+_reverse_asciinator_loop:
+	mov r14, _chars_printed
+	mov r15, r14
+	add r14, r13
+	add r15, r10
+	dec r15
+	
+	mov r11b, [r15]
+	mov r8b, [r14] 	
+	mov [r15], r8b
+	mov [r14], r11b
+	dec r10	
+	inc r13
+
+	cmp r10, r13
+	ja _reverse_asciinator_loop
+
+_write_for_asciinator_loop:
+	inc r9
+	mov byte [_chars_printed + r9], 0x0A
+	inc r9
+	mov byte [_chars_printed + r9], 0x00
+
+
+	mov rax, 1 ; write 
+	mov rdi, 1 ; std out
+	mov rsi, _chars_printed
+	mov rdx, r9
+	syscall
+	ret
+
