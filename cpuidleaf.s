@@ -3,42 +3,48 @@
 ;
 ; Now look at the bear
 ; He's very cute ^^
-; ʕ·͡ᴥ͡͡·ʔ <---------- This wasn't copy pasted...
+; ʕ·͡ᴥ͡͡·ʔ
 
 
+; _leafs will be used for the duration of the program
 section .bss
-	cpudata resb 14 ; reserve 12 bytes for cpuid data
-	; and 2 bytes for new line and null terminator
-	_helper resb 128
-	_buffer resb 64
-
+	_leafs resb 8
+; For predefined text only
 section .data
 	leaf_info0 db 'Number of available leafs:', 0x0a
 	leaf_info0_2 db 'Vendor ID:', 0x0a
-	_chars_printed dq 0
 
 section .text
 	global _start;
 _start:
-	xor eax, eax ; number of leafs you can query
-	; int3 ; this is sigtrap, it's for debug
-	cpuid
-	mov r12d,         eax ; save the counter
-	mov [cpudata],    ebx
-	mov [cpudata+4],  edx
-	mov [cpudata+8],  ecx
-	mov byte [cpudata + 12], 0x0A ; New line \n
-	mov byte [cpudata + 13], 0x00 	
+_cpuid0:
+	push rbp ; function prologue
+	push rbx
+	push r12
+	push r13
+	push r14
+	push r15		
+	mov rbp, rsp
 
-; Write the number of leafs
+	sub rsp, 16 ; reserve space on stack
+	xor eax, eax ; number of leafs you can query
+	cpuid
+	mov [_leafs], rax ; save leaf count
+
+	mov [rbp - 8], ecx
+	mov [rbp - 12], edx
+	mov [rbp - 16], ebx
+	mov byte [rbp - 4], 0x0A ; New line \n
+	mov byte [rbp - 3], 0x00 	
+
+	; Write the number of leafs
 	mov rax, 1 ; write
 	mov rdi, 1 ; std out
 	mov rsi, leaf_info0
 	mov rdx, 27
 	syscall
 	
-	xor r10, r10
-	xor r13, r13
+	mov rdi, [_leafs]
 	call _asciinator_loop
 
 ; Write the Vendor ID
@@ -50,66 +56,93 @@ _start:
 
 	mov rax, 1 ; write
 	mov rdi, 1 ; std out
-	mov rsi, cpudata
-	mov rdx, 14
+	mov r12, rbp
+	sub r12, 16
+	mov rsi, r12
+	mov rdx, 16
 	syscall	
 	
 	jmp _exit;
+	; restore registers in the same order
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop rbx
+	pop rbp
+
 _exit: 
 	mov rax, 60 ; exit call
 	xor edi, edi ; this syscall checks only lower 32 bits
 	syscall
 
-; _asciinator_loop requires:
-; r10 for iterator, r13 for reverse iterator
-; _chars_printed for printing ascii
-; r12 should hold the value you'd like to turn into ascii
-_asciinator_loop:
-	xor rdx, rdx
-	mov rax, r12
-	mov rbx, 10
-	div rbx
-	
-	mov r12, rax
 
+; _asciinator_loop:
+; rdi should hold the value you'd like to turn into ascii
+_asciinator_loop:
+	push rbp ; function prologue
+	push rbx
+	push r12
+	push r13
+	push r14
+	push r15		
+	mov rbp, rsp
+
+	sub rsp, 64 ; reserve space on stack
+	xor r9, r9	
+	mov rbx, 10
+	mov rax, rdi
+_loop:	
+	xor rdx, rdx
+	div rbx
 	add rdx, '0'
-	mov [_chars_printed + r10], rdx
-	inc r10
+	mov [rbp + r9 - 64], rdx
+	inc r9
 
 	cmp rax, 0
-	jne _asciinator_loop		
-	
-	mov r9, r10
+	jne _loop		
+	cmp r9, 1
+	je _write_for_asciinator_loop
+
 	xor r11, r11
-	xor r8, r8	
+	xor r8, r8
+
+	dec r9
+	lea r14, [rsp]
+	lea r15, [rsp]
+	add r15, r9
 _reverse_asciinator_loop:
-	mov r14, _chars_printed
-	mov r15, r14
-	add r14, r13
-	add r15, r10
-	dec r15
-	
-	mov r11b, [r15]
 	mov r8b, [r14] 	
-	mov [r15], r8b
+	mov r11b, [r15]
+
 	mov [r14], r11b
-	dec r10	
-	inc r13
+	mov [r15], r8b
 
-	cmp r10, r13
-	ja _reverse_asciinator_loop
+	inc r14
+	dec r15	
 
+	cmp r14, r15
+	jb _reverse_asciinator_loop
 _write_for_asciinator_loop:
-	inc r9
-	mov byte [_chars_printed + r9], 0x0A
-	inc r9
-	mov byte [_chars_printed + r9], 0x00
+	mov byte [rbp - 63 + r9], 0x0A
+	mov byte [rbp - 62 + r9], 0x00
+	add r9, 3
 
-
+	lea r14, [rsp]
 	mov rax, 1 ; write 
 	mov rdi, 1 ; std out
-	mov rsi, _chars_printed
+	mov rsi, r14 
 	mov rdx, r9
 	syscall
+	
+
+	add rsp, 64
+	; restore registers in the same order
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop rbx
+	pop rbp
 	ret
 
