@@ -1,0 +1,16 @@
+if defined
+TOT MUSICA <= 0
+
+ISO646 header is required to use those funny little alternative operators like not_eq and xor
+
+Everyone, please welcome the smol one: 22 
+ 4 16 64 256
+ 
+Argument list:
+ 2
+ 3
+Argument list:
+ 11
+ 21
+ 37
+F result: 0 
