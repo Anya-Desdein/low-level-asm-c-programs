@@ -1,6 +1,6 @@
 SHELL = /bin/sh
 
-.SUFFIXES:
+SUFFIXES:
 
 CC := gcc
 
@@ -36,4 +36,4 @@ executable3: main.o add_ons.so
 	
 # Clean
 clean:
-	rm -f *.o add_ons.a executable executable2
+	rm -f *.o add_ons.a add_ons.so executable executable2 executable3
