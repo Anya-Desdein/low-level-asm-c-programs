@@ -1,0 +1,9 @@
+
+example.o:     file format elf64-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+  0 .bss          00000002  0000000000000000  0000000000000000  00000200  2**2
+                  ALLOC
+  1 .text         00000048  0000000000000000  0000000000000000  00000200  2**4
+                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE

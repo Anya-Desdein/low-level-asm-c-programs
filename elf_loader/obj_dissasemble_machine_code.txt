@@ -1,0 +1,24 @@
+
+example.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <_start>:
+   0:	41 bd 03 00 00 00    	mov    $0x3,%r13d
+   6:	41 be 04 00 00 00    	mov    $0x4,%r14d
+   c:	4d 01 ee             	add    %r13,%r14
+   f:	49 83 c6 30          	add    $0x30,%r14
+  13:	4c 89 34 25 00 00 00 	mov    %r14,0x0
+  1a:	00 
+  1b:	c6 04 25 00 00 00 00 	movb   $0xa,0x0
+  22:	0a 
+  23:	b8 01 00 00 00       	mov    $0x1,%eax
+  28:	bf 01 00 00 00       	mov    $0x1,%edi
+  2d:	48 be 00 00 00 00 00 	movabs $0x0,%rsi
+  34:	00 00 00 
+  37:	ba 02 00 00 00       	mov    $0x2,%edx
+  3c:	0f 05                	syscall
+  3e:	b8 3c 00 00 00       	mov    $0x3c,%eax
+  43:	48 31 ff             	xor    %rdi,%rdi
+  46:	0f 05                	syscall
