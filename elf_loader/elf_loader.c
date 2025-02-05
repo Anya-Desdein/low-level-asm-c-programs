@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
 
 	char buffer[BUFFER_SIZE];
 	ssize_t bytes_read;
-	struct E_ident {
+	typedef struct {
 		unsigned char el_mag0;	
 		unsigned char el_mag1;
 		unsigned char el_mag2;
@@ -40,8 +40,15 @@ int main(int argc, char *argv[]) {
 		unsigned char el_osabi;
 		unsigned char el_abiversion;
 		unsigned char el_pad;
-		unsigned char el_nident;
-	} E_ident;
+	} E_ident_t;
+
+	union E_ident_u {
+		E_ident_t as_struct;
+		unsigned char as_bytes[16];
+	};
+
+	union E_ident_u E_ident_i;
+
 	unsigned char e_magic[] = {0x7f, 0x45, 0x4c, 0x46}; 
 
 	off_t buf_iter = 0;
@@ -59,6 +66,9 @@ int main(int argc, char *argv[]) {
 					printf("\n");
 					break;
 				}
+				
+				memcpy(&E_ident_i.as_bytes[0], &buffer, sizeof(E_ident_i));
+				memcpy(&E_ident_i.as_struct, &buffer, sizeof(E_ident_i));
 				is_magic = 1;
 			}
 			
@@ -71,6 +81,8 @@ int main(int argc, char *argv[]) {
 				printf("\n");
 				puts("It's an elf!");
 			}
+			
+			printf("%02x %02x %02x %02x \n", E_ident_i.as_bytes[1], E_ident_i.as_bytes[2], E_ident_i.as_bytes[3], E_ident_i.as_bytes[4]);
 		}
 		
 		if (buf_iter >= f_len) {	
@@ -79,6 +91,8 @@ int main(int argc, char *argv[]) {
 
 		buf_iter += 1024;
 		lseek(file_descr, buf_iter, SEEK_SET);
+	
 	}
+
 	return 0;
 }
