@@ -27,8 +27,12 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+
+
 	char buffer[BUFFER_SIZE];
 	ssize_t bytes_read;
+
+
 	typedef struct {
 		unsigned char el_mag0;	
 		unsigned char el_mag1;
@@ -39,15 +43,15 @@ int main(int argc, char *argv[]) {
 		unsigned char el_version;
 		unsigned char el_osabi;
 		unsigned char el_abiversion;
-		unsigned char el_pad;
 	} E_ident_t;
 
 	union E_ident_u {
 		E_ident_t as_struct;
-		unsigned char as_bytes[16];
+		unsigned char as_bytes[9];
 	};
-
+	
 	union E_ident_u E_ident_i;
+
 
 	unsigned char e_magic[] = {0x7f, 0x45, 0x4c, 0x46}; 
 
@@ -72,16 +76,52 @@ int main(int argc, char *argv[]) {
 			if (!is_magic) {
 				puts("Not an elf");
 				break;
-			} else {
-				printf("\n");
-				puts("It's an elf!");
 			}
-		
+			puts("");
+
 			memcpy(&E_ident_i.as_bytes[0], &buffer, sizeof(E_ident_i));
 			memcpy(&E_ident_i.as_struct, &buffer, sizeof(E_ident_i));
 			
-			printf("%02x\n",E_ident_i.as_bytes[5]);
-			// printf("%02x\n", E_ident_i.as_struct.el_data);
+			// Class
+			if (E_ident_i.as_bytes[4] > 2 || E_ident_i.as_bytes[4] < 1 ) {
+				printf("Unknown ELF Class %02x\n", E_ident_i.as_bytes[4]);
+			} else if (E_ident_i.as_bytes[4] == 2) {
+				printf("ELF 64-bit\n");
+			} else if (E_ident_i.as_bytes[4] == 1) {
+				printf("ELF 32-bit\n");
+			}
+
+			// Data Encoding
+			if (E_ident_i.as_bytes[5] > 2 || E_ident_i.as_bytes[5] < 1 ) {
+				printf("Unknown Data Encoding %02x\n", E_ident_i.as_bytes[5]);
+			} else if (E_ident_i.as_bytes[5] == 2) {
+				printf("Big-endian\n");
+			} else if (E_ident_i.as_bytes[5] == 1) {
+				printf("Little-endian\n");
+			}
+			
+			// Version
+			printf("File version: %02x\n", E_ident_i.as_bytes[6]);
+
+
+			// Operating System & ABI
+			if (E_ident_i.as_bytes[7] == 0) {
+				printf("System V ABI\n");
+			} else if (E_ident_i.as_bytes[7] == 1) {
+				printf("HP-UX OS\n");
+			} else if (E_ident_i.as_bytes[7] == 255) {
+				printf("Standalone (embedded) application\n");
+			} else {
+				printf("Unknown OS & ABI %02x\n", E_ident_i.as_bytes[7]);
+			}
+
+			// ABI Version
+			printf("ABI Version: %02x\n", E_ident_i.as_bytes[8]);
+
+
+
+
+
 		}
 		
 		if (buf_iter >= f_len) {	
