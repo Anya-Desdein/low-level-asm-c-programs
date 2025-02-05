@@ -66,23 +66,22 @@ int main(int argc, char *argv[]) {
 					printf("\n");
 					break;
 				}
-				
-				memcpy(&E_ident_i.as_bytes[0], &buffer, sizeof(E_ident_i));
-				memcpy(&E_ident_i.as_struct, &buffer, sizeof(E_ident_i));
 				is_magic = 1;
 			}
 			
 			if (!is_magic) {
 				puts("Not an elf");
 				break;
-			}
-	
-			if(is_magic) {
+			} else {
 				printf("\n");
 				puts("It's an elf!");
 			}
+		
+			memcpy(&E_ident_i.as_bytes[0], &buffer, sizeof(E_ident_i));
+			memcpy(&E_ident_i.as_struct, &buffer, sizeof(E_ident_i));
 			
-			printf("%02x %02x %02x %02x \n", E_ident_i.as_bytes[1], E_ident_i.as_bytes[2], E_ident_i.as_bytes[3], E_ident_i.as_bytes[4]);
+			printf("%02x\n",E_ident_i.as_bytes[5]);
+			// printf("%02x\n", E_ident_i.as_struct.el_data);
 		}
 		
 		if (buf_iter >= f_len) {	
