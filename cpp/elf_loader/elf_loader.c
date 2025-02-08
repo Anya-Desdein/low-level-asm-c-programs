@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <stdint.h>
+
 void clfl(int *file_descr) {
 	printf("Closing file descriptor number %d\n", *file_descr);
 	close(*file_descr);
@@ -31,6 +33,7 @@ int main(int argc, char *argv[]) {
 	char buffer[BUFFER_SIZE];
 	ssize_t bytes_read;
 
+	// E_ident
 	typedef struct {
 		unsigned char el_mag0;	
 		unsigned char el_mag1;
@@ -53,6 +56,26 @@ int main(int argc, char *argv[]) {
 
 	union E_ident_u E_ident_i;
 	unsigned char e_magic[] = {0x7f, 0x45, 0x4c, 0x46}; 
+
+	// Full ELF Header 
+	typedef struct {
+		unsigned char e_ident[16]; // ELF identification
+		uint16_t e_type; // Object file type
+		uint16_t e_machine; // Machine type
+		uint32_t e_version; // Obj file version
+		uint64_t e_entry; // Entry point addr
+		uint64_t e_phoff; // Program header offstet
+		uint64_t e_shoff; // Section header offset
+		uint32_t e_flags; // Processor-specific flags
+		uint16_t e_ehsize; // ELF header size
+		uint16_t e_phentsize; // Size of program header entry
+		uint16_t e_phnum; // Number of program header entries
+		uint16_t e_shentsize; // Size of section header entry
+		uint16_t e_shnum; // Number of section header entries
+		uint16_t e_shstmdx; // Section name string table index 
+	} Elf64_Ehdr; 
+	
+	Elf64_Ehdr E_hdr;
 
 	struct stat file_status;
 	int fstat_chck = fstat(file_descr, &file_status);
@@ -90,6 +113,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	puts("");
+	
+	memcpy(&E_hdr, &E_ident_i.as_bytes, sizeof(E_hdr.e_ident));
 	
 	// Class
 	if (E_ident_i.as_bytes[4] > 2 || E_ident_i.as_bytes[4] < 1 ) {
@@ -129,6 +154,9 @@ int main(int argc, char *argv[]) {
 
 	// ABI Version
 	printf("ABI Version: %02x\n", E_ident_i.as_bytes[8]);
+
+	memcpy(&E_hdr, &buffer + 16, 48);
+	printf("%hu\n", E_hdr.e_type);
 
 	return 0;
 }
