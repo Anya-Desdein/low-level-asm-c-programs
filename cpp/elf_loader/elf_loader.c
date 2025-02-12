@@ -246,9 +246,39 @@ int main(int argc, char *argv[]) {
 		printf("Shstmdx: %" PRIu16 "\n", h.e_shstmdx);
 	}
 	
+	char *buffer_entry = malloc(h.e_phentsize);
+	off_t curr_entry;
+	off_t desc_loc;
+	for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
+		desc_loc = entries_read * h.e_phentsize + h.e_phoff;
+
+		lseek(file_descr, desc_loc, SEEK_SET);
+	
+		for (off_t bytes_read=0; bytes_read < h.e_phentsize; ) {
+			curr_entry = read(file_descr, buffer_entry + bytes_read, h.e_phentsize - bytes_read);
+			if (curr_br == -1) {
+				printf("Error reading file\n");
+				return 1;
+			}
+
+			if (curr_br == 0) {
+				printf("Unexpected EoF\n");
+				return 1;
+			}
+
+			bytes_read += curr_br;
+		}
+	
+		printf("Header entry bytes:\n");
+			uint64_t print_count = h.e_phentsize/2;
+			for (uint64_t i=0; i<print_count; i++) {
+				printf("%02x ", (unsigned char)buffer_entry[i]);
+			}
+		printf("\n");
 
 
-
+	} free(buffer_entry);
+	buffer_entry = NULL;
 
 	return 0;
 }
