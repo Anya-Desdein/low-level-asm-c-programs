@@ -9,14 +9,19 @@
 #include <sys/stat.h>
 
 #include <stdint.h>
+#include <inttypes.h>
 
-void clfl(int *file_descr) {
+int IS_PIE = 0;
+
+static void clfl(int *file_descr) {
 	printf("Closing file descriptor number %d\n", *file_descr);
 	close(*file_descr);
 }
 
-
-#define BUFFER_SIZE 64
+static void is_pie() {
+	// TODO: find how to differentiate PIE from shared object
+	IS_PIE = 1;
+}
 
 int main(int argc, char *argv[]) {
 	if (argc !=2) {
@@ -30,7 +35,6 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	char buffer[BUFFER_SIZE];
 	ssize_t bytes_read;
 
 	// E_ident
@@ -51,15 +55,13 @@ int main(int argc, char *argv[]) {
 		E_ident_t as_struct;
 		unsigned char as_bytes[sizeof(E_ident_t)];
 	};
-	
 	_Static_assert(sizeof(E_ident_t) == 16, "e_ident not 16 bytes");
 
-	union E_ident_u E_ident_i;
 	unsigned char e_magic[] = {0x7f, 0x45, 0x4c, 0x46}; 
 
 	// Full ELF Header 
 	typedef struct {
-		unsigned char e_ident[16]; // ELF identification
+		union E_ident_u e_ident; // ELF identification
 		uint16_t e_type; // Object file type
 		uint16_t e_machine; // Machine type
 		uint32_t e_version; // Obj file version
@@ -75,7 +77,8 @@ int main(int argc, char *argv[]) {
 		uint16_t e_shstmdx; // Section name string table index 
 	} Elf64_Ehdr; 
 	
-	Elf64_Ehdr E_hdr;
+	Elf64_Ehdr h;
+	_Static_assert(sizeof(Elf64_Ehdr) == 64, "e_header not 64 bytes");
 
 	struct stat file_status;
 	int fstat_chck = fstat(file_descr, &file_status);
@@ -84,9 +87,10 @@ int main(int argc, char *argv[]) {
 	}
 	printf("File size: %lld\n", (long long)file_status.st_size);
 	
+	char *buffer = (char *)&h;
 	off_t curr_br;
 	for (off_t bytes_read=0; bytes_read < 64; ) {
-		curr_br = read(file_descr, buffer + bytes_read, (BUFFER_SIZE - bytes_read));
+		curr_br = read(file_descr, buffer + bytes_read, (sizeof(Elf64_Ehdr) - bytes_read));
 		if (curr_br == -1) {
 			printf("Error reading file\n");
 			return 1;
@@ -100,13 +104,10 @@ int main(int argc, char *argv[]) {
 		bytes_read += curr_br;
 	}
 	
-	memcpy(&E_ident_i.as_bytes[0], &buffer, sizeof(E_ident_i));
-	memcpy(&E_ident_i.as_struct, &buffer, sizeof(E_ident_i));
-		
 	for (int i=0; i<(sizeof(e_magic)/sizeof(e_magic[0])); i++) {
-		printf("%c", E_ident_i.as_bytes[i]);
+		printf("%c", h.e_ident.as_bytes[i]);
 				
-		if(e_magic[i] != E_ident_i.as_bytes[i]) {
+		if(e_magic[i] != h.e_ident.as_bytes[i]) {
 			puts("");
 			printf("Not an Elf: No Magic\n");
 			return 1;		
@@ -114,49 +115,140 @@ int main(int argc, char *argv[]) {
 	}
 	puts("");
 	
-	memcpy(&E_hdr, &E_ident_i.as_bytes, sizeof(E_hdr.e_ident));
-	
 	// Class
-	if (E_ident_i.as_bytes[4] > 2 || E_ident_i.as_bytes[4] < 1 ) {
-		printf("Unknown ELF Class %02x\n", E_ident_i.as_bytes[4]);
+	if (h.e_ident.as_bytes[4] > 2 || h.e_ident.as_bytes[4] < 1 ) {
+		printf("Unknown ELF Class %02x\n", h.e_ident.as_bytes[4]);
 		return 1;
-	} else if (E_ident_i.as_bytes[4] == 2) {
+	} else if (h.e_ident.as_bytes[4] == 2) {
 		printf("ELF 64-bit\n");
-	} else if (E_ident_i.as_bytes[4] == 1) {
+	} else if (h.e_ident.as_bytes[4] == 1) {
 		printf("ELF 32-bit\n");
 	}
 
 	// Data Encoding
-	if (E_ident_i.as_bytes[5] > 2 || E_ident_i.as_bytes[5] < 1 ) {
-		printf("Unknown Data Encoding %02x\n", E_ident_i.as_bytes[5]);
+	if (h.e_ident.as_bytes[5] > 2 || h.e_ident.as_bytes[5] < 1 ) {
+		printf("Unknown Data Encoding %02x\n", h.e_ident.as_bytes[5]);
 		return 1;
-	} else if (E_ident_i.as_bytes[5] == 2) {
+	} else if (h.e_ident.as_bytes[5] == 2) {
 		printf("Big-endian\n");
-	} else if (E_ident_i.as_bytes[5] == 1) {
+	} else if (h.e_ident.as_bytes[5] == 1) {
 		printf("Little-endian\n");
 	}
 			
 	// Version
-	printf("File version: %02x\n", E_ident_i.as_bytes[6]);
+	printf("File version: %02x\n", h.e_ident.as_bytes[6]);
 
 
 	// Operating System & ABI
-	if (E_ident_i.as_bytes[7] == 0) {
+	if (h.e_ident.as_bytes[7] == 0) {
 		printf("System V ABI\n");
-	} else if (E_ident_i.as_bytes[7] == 1) {
+		// Only this 
+	} else if (h.e_ident.as_bytes[7] == 1) {
 		printf("HP-UX OS\n");
-	} else if (E_ident_i.as_bytes[7] == 255) {
+		return 1;
+	} else if (h.e_ident.as_bytes[7] == 255) {
 		printf("Standalone (embedded) application\n");
+		return 1;
 	} else {
-		printf("Unknown OS & ABI %02x\n", E_ident_i.as_bytes[7]);
+		printf("Unknown OS & ABI %02x\n", h.e_ident.as_bytes[7]);
 		return 1;
 	}
 
 	// ABI Version
-	printf("ABI Version: %02x\n", E_ident_i.as_bytes[8]);
+	printf("ABI Version: %02x\n", h.e_ident.as_bytes[8]);
 
-	memcpy(&E_hdr, &buffer + 16, 48);
-	printf("%hu\n", E_hdr.e_type);
+	printf("h.e_type: %hu\n", h.e_type);
+
+	// File type
+	if (h.e_type == 0) {
+		printf("No file type\n");
+		return 1;
+	} else if (h.e_type == 1) {
+		printf("Relocatable object file\n");
+		return 1;
+	} else if (h.e_type == 2) {
+		printf("Executable file\n");
+		// Executable file
+	} else if (h.e_type == 3) {
+		printf("Shared object file\n");
+		// Position-independent executables (PIE)
+		// AND
+		// Relocatable object files
+		
+		is_pie();
+
+		if (IS_PIE == 1) {
+			printf("This is PIE\n");	
+		}
+	} else if (h.e_type == 4) {
+		printf("Core file\n");
+		return 1;
+	} else if (h.e_type == 0xFEFF || h.e_type == 0xFE00) {
+		printf("Environment-specific use\n");
+		return 1;
+	} else if (h.e_type == 0xFFFF || h.e_type == 0xFF00) {
+		printf("Processor-specific use\n");
+		return 1;
+	} else {
+		printf("Unknown file type\n");
+		return 1;
+	};
+
+	// Target architecture
+	// For System V ABI only
+	// Based on sco.com's machine table for System V ABI
+	// Only x86 for now
+	if (h.e_machine == 62) {
+		printf("AMD x86-64 architecture\n");
+
+	} else {
+		printf("Machine type: %hu\nThis architecture type is currently not being supported", h.e_machine);
+		return 1;
+	}
+
+	if (h.e_version == 1) {
+		printf("Valid ELF version == 1\n");
+	} else {
+		printf("Invalid ELF version\n");
+	}
+	
+	// Entry point
+	printf("Entry point addr: %" PRIu64 "\n", h.e_entry);
+
+	// Program header table offset
+	printf("Program header table offset: %" PRIu64 "\n", h.e_phoff);
+	
+	// Section header table offset
+	printf("Program header table offset: %" PRIu64 "\n", h.e_shoff);
+
+	// Flags
+	printf("Flags: %" PRIu32 "\n", h.e_flags);
+	
+	// ELF header size
+	printf("ELF header size: %" PRIu16 "\n", h.e_ehsize);
+	
+	// Program header table entry size
+	printf("Program header entry size: %" PRIu16 "\n", h.e_phentsize);
+
+	// Program header table entry count
+	printf("Number of entries in program header: %" PRIu16 "\n", h.e_phnum);
+	
+	// Section header table entry size 
+	printf("Section header entry size: %" PRIu16 "\n", h.e_shentsize);
+	
+	// Section header table entry count
+	printf("Number of entries in section section: %" PRIu16 "\n", h.e_shnum);
+	
+	// Index of section containing section name string table inside section header 
+	if (h.e_shstmdx == 0) {
+		printf("SHN_UNDEF\n");
+	} else {
+		printf("Shstmdx: %" PRIu16 "\n", h.e_shstmdx);
+	}
+	
+
+
+
 
 	return 0;
 }
