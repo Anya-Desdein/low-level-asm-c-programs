@@ -245,8 +245,23 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("Shstmdx: %" PRIu16 "\n", h.e_shstmdx);
 	}
+
+	// ELF program header entry
+	typedef struct {
+		uint32_t p_type; // Type of segment
+		uint32_t p_flags; // Segment attributes
+		uint64_t p_offset; // Offset in file
+		uint64_t p_vaddr; // Virtual address in memory
+		uint64_t p_paddr; // Reserved
+		uint64_t p_filesz; // Size of segment in file
+		uint64_t p_memsz; // Size of segment in memory
+		uint64_t p_align; // Alignment of segment
+	} E_phdr;
+
+	E_phdr ph;
+	_Static_assert(sizeof(ph) == 56, "e_ident not 56 bytes");
 	
-	char *buffer_entry = malloc(h.e_phentsize);
+	char *buffer_entry = (char *)&ph;
 	off_t curr_entry;
 	off_t desc_loc;
 	for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
@@ -269,16 +284,33 @@ int main(int argc, char *argv[]) {
 			bytes_read += curr_br;
 		}
 	
-		printf("Header entry bytes:\n");
-			uint64_t print_count = h.e_phentsize/2;
-			for (uint64_t i=0; i<print_count; i++) {
-				printf("%02x ", (unsigned char)buffer_entry[i]);
-			}
-		printf("\n");
-
-
-	} free(buffer_entry);
-	buffer_entry = NULL;
+		printf("Segment number %jd: ", (entries_read+1));
+		// Segment type
+		if (ph.p_type == 0) {
+			printf("Skipping unused entry\n");
+			continue;
+		} else if (ph.p_type == 1) {
+			printf("Loadable\n");
+		} else if (ph.p_type == 2) {
+			printf("Dynamic linking tables\n");
+		}  else if (ph.p_type == 3) {
+			printf("Program interpreter path name\n");
+		}  else if (ph.p_type == 4) {
+			printf("Note sections\n");
+		} else {
+			printf("Incorrect entry type\n");
+			return 1;
+		}
+		
+		// Offset in file
+		if (ph.p_offset < 0) {
+			printf("Incorrect offset: %" PRIu64 "\n", ph.p_offset);
+			return 1;
+		} else {
+			printf("Offset in file: %" PRIu64 "\n", ph.p_offset);
+		}
+		
+	} 
 
 	return 0;
 }
