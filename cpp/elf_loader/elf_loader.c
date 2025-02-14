@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -309,7 +310,34 @@ int main(int argc, char *argv[]) {
 		} else {
 			printf("Offset in file: %" PRIu64 "\n", ph.p_offset);
 		}
-		
+	
+		// Segment Attr
+		printf("PROT: %c%c%c\n",
+			ph.p_flags & 0x04 ? 'R' : '-',
+			ph.p_flags & 0x02 ? 'W' : '-',
+			ph.p_flags & 0x01 ? 'X' : '-'
+		);
+
+		unsigned int prot_flags = 0;
+		if (ph.p_flags & 0x04)
+			prot_flags |= PROT_READ;
+		if (ph.p_flags & 0x02)
+			prot_flags |= PROT_WRITE;
+		if (ph.p_flags & 0x01)
+			prot_flags |= PROT_EXEC;
+		if (ph.p_flags == 0)
+			prot_flags |= PROT_NONE;
+
+		unsigned int page_flags = 0;		
+		if (IS_PIE == 0)
+			page_flags |= MAP_FIXED;
+
+		void* segment_addr = mmap((void *)ph.p_vaddr, 4096, prot_flags, page_flags | MAP_PRIVATE, file_descr, ph.p_offset);
+		//void* segment_addr = mmap((void *)ph.p_vaddr, ph.p_memsz, prot_flags, page_flags, file_descr, ph.p_offset);
+		if (segment_addr == MAP_FAILED) {
+			perror("mmap");
+			return 1;
+		}
 	} 
 
 	return 0;
