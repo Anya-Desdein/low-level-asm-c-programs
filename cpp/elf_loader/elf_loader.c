@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#include <limits.h>
+
 int IS_PIE = 0;
 
 static void clfl(int *file_descr) {
@@ -329,16 +331,25 @@ int main(int argc, char *argv[]) {
 			prot_flags |= PROT_NONE;
 
 		unsigned int page_flags = 0;		
-		if (IS_PIE == 0)
+		IS_PIE = 1; // Delete after differentiating shared library from PIE
+		if (h.e_type == 3 && IS_PIE == 1) 
+			page_flags |= MAP_PRIVATE;
+		if (h.e_type == 2) {
 			page_flags |= MAP_FIXED;
+			page_flags |= MAP_PRIVATE;
+		} 
 
-		void* segment_addr = mmap((void *)ph.p_vaddr, 4096, prot_flags, page_flags | MAP_PRIVATE, file_descr, ph.p_offset);
-		//void* segment_addr = mmap((void *)ph.p_vaddr, ph.p_memsz, prot_flags, page_flags, file_descr, ph.p_offset);
+		void* segment_addr = mmap((void *)ph.p_vaddr, ph.p_memsz, prot_flags, page_flags, file_descr, ph.p_offset);
 		if (segment_addr == MAP_FAILED) {
 			perror("mmap");
 			return 1;
 		}
+		
 	} 
-
+	
+	void (*entry)() = (void (*)())h.e_entry;
+	entry();
+	
+	
 	return 0;
 }
