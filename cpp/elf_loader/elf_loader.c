@@ -350,6 +350,5 @@ int main(int argc, char *argv[]) {
 	void (*entry)() = (void (*)())h.e_entry;
 	entry();
 	
-	
 	return 0;
 }
