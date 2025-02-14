@@ -1,0 +1,18 @@
+Contents:
+- ELF loader (elf_loader.c)
+- Test files (^example.*)
+- Makefile
+
+To compile & run tests, follow these steps:
+- Use a Linux-based system 
+- Install the required packages:
+	- Debian-based: build-essential
+	- Arch-based: base-devel
+	- All: clang nasm
+- Compile & Run:
+	make
+
+- Clean up: 
+	make clean
+
+
