@@ -25,12 +25,12 @@ $(OBJ): $(INT)
 	nasm -f elf64 example.s -o example.o	
 
 example_att: $(ATT)
-	$(CC) -no-pie -nostartfiles -g -o $@ $<
+	$(CC) -no-pie -nostartfiles -Wl,--no-dynamic-linker -g -o $@ $<
 
 
 # PIE
 example_pie: $(ATT)
-	$(CC) -nostartfiles -g -o $@ $<
+	$(CC) -nostartfiles -Wl,--no-dynamic-linker -g -o $@ $<
 
 ### LOADER BUILD
 elf_loader: $(LOD) 
