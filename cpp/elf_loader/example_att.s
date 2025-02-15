@@ -1,7 +1,7 @@
-.bss
+.section .bss, "aw", @nobits
 	char: .zero 2
 
-.text
+.section .text, "x", @nobits
 	.globl _start
 
 _start:
