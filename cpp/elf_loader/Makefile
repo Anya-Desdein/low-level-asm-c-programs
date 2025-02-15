@@ -34,7 +34,7 @@ example_pie: $(ATT)
 
 ### LOADER BUILD
 elf_loader: $(LOD) 
-	$(CG) $(CG) -o elf_loader -O0 -g
+	$(CG) $(LOD) -o elf_loader -O0 -g
 
 ### LOAD
 load: elf_loader example example_att example_pie
