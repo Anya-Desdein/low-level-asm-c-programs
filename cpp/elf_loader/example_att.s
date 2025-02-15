@@ -1,13 +1,10 @@
-.section .bss
+.section .bss, "aw", @nobits
 	char: .zero 2
 
-.section .text
+.section .text, "x", @nobits
 	.globl _start
 
 _start:
-	lea char(%rip), %rsi
-	mov $2, %rdx
-
 	mov $3, %r13
 	mov $4, %r14
 	addq %r13, %r14
@@ -20,7 +17,7 @@ _start:
 	mov $1, %rdi # std out
 	lea char(%rip), %rsi # pointer to char buffer
 	
-	mov $2, %rdx # how many bytes to write
+	mov $1, %rdx # how many bytes to write
 	syscall
 
 # Sys_exit
