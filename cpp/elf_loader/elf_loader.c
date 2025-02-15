@@ -177,7 +177,8 @@ int main(int argc, char *argv[]) {
 			bytes_read += curr_br;
 		}
 	
-		printf("Segment number %jd: ", (entries_read+1));
+		// For debug only
+		printf("Processing %jd segment\n", (entries_read+1));
 		// Segment type
 		if (ph.p_type < 1 && ph.p_type > 4) {
 			printf("Skipping entry\n");
