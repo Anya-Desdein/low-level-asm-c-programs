@@ -1,4 +1,4 @@
-S$HELL = /bin/sh
+SHELL = /bin/sh
 
 .PHONY: load
 
