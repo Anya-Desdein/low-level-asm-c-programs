@@ -14,6 +14,8 @@
 
 #include <limits.h>
 
+unsigned long PAGE_SIZE = 0x1000;
+
 int IS_BIG_ENDIAN = 0;
 int IS_PIE = 0;
 
@@ -28,10 +30,16 @@ static void is_pie() {
 
 // Adjust vaddr alignment
 unsigned long page_align(unsigned long p) {
-	unsigned long PAGE_SIZE = 0x1000;
 	p = (p+PAGE_SIZE-1) & (~(PAGE_SIZE-1));
 	return p;
 }
+
+//Adjust offset alignment
+unsigned long page_align_d(unsigned long p) {
+	p = p & (~(PAGE_SIZE-1));
+	return p;
+}
+
 
 int main(int argc, char *argv[]) {
 	if (argc !=2) {
@@ -206,11 +214,12 @@ int main(int argc, char *argv[]) {
 		if (ph.p_flags & 0x01)
 			prot_flags |= PROT_EXEC;
 		if (ph.p_flags == 0)
-			prot_flags |= PROT_NONE;
+			prot_flags = PROT_NONE;
 
 		unsigned int page_flags = 0;		
 		IS_PIE = 1; // Delete after differentiating shared library from PIE
 		if (h.e_type == 3 && IS_PIE == 1) 
+			page_flags |= MAP_FIXED;
 			page_flags |= MAP_PRIVATE;
 		if (h.e_type == 2) {
 			page_flags |= MAP_FIXED;
@@ -219,14 +228,27 @@ int main(int argc, char *argv[]) {
 		
 		// If a segment is of size 0, check flags and handle 
 		if (ph.p_memsz == 0) { 
-			printf("Segment of size 0\n");
+			printf("Skipping segment of size 0\n");
 			continue;
 		}
 
+		// Adjust offset alignment
+		unsigned long prev = ph.p_offset;
+		ph.p_offset = page_align_d(ph.p_offset);
+		unsigned long diff = prev - ph.p_offset;
+
+		if (diff != 0)
+			printf("Segment offset moved by %lu bytes, from %lu to %" PRIu64 "\n", diff, prev, ph.p_offset);
+	
 		// Adjust vaddr alignment
+		printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
+		ph.p_vaddr += diff;
+		printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
 		ph.p_vaddr = page_align(ph.p_vaddr);
-		
-		void* segment_addr = mmap((void *)ph.p_vaddr, ph.p_memsz, prot_flags, page_flags, file_descr, ph.p_offset);
+		printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
+
+
+		void* segment_addr = mmap((void *)ph.p_vaddr, page_align(ph.p_memsz), prot_flags, page_flags, file_descr, ph.p_offset);
 		if (segment_addr == MAP_FAILED) {
 			perror("mmap");
 			printf("Size of the segment: %" PRIu64 "\n",ph.p_memsz);
