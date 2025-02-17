@@ -26,6 +26,13 @@ static void is_pie() {
 	IS_PIE = 1;
 }
 
+// Adjust vaddr alignment
+unsigned long page_align(unsigned long p) {
+	unsigned long PAGE_SIZE = 0x1000;
+	p = (p+PAGE_SIZE-1) & (~(PAGE_SIZE-1));
+	return p;
+}
+
 int main(int argc, char *argv[]) {
 	if (argc !=2) {
 		printf("Usage: %s FILE_PATH\n", argv[0]);
@@ -209,10 +216,22 @@ int main(int argc, char *argv[]) {
 			page_flags |= MAP_FIXED;
 			page_flags |= MAP_PRIVATE;
 		} 
+		
+		// If a segment is of size 0, check flags and handle 
+		if (ph.p_memsz == 0) { 
+			printf("Segment of size 0\n");
+			continue;
+		}
 
+		// Adjust vaddr alignment
+		ph.p_vaddr = page_align(ph.p_vaddr);
+		
 		void* segment_addr = mmap((void *)ph.p_vaddr, ph.p_memsz, prot_flags, page_flags, file_descr, ph.p_offset);
 		if (segment_addr == MAP_FAILED) {
 			perror("mmap");
+			printf("Size of the segment: %" PRIu64 "\n",ph.p_memsz);
+			printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
+			printf("Offset in file: %" PRIu64 " \n",ph.p_offset);
 			return 1;
 		}
 	} 
