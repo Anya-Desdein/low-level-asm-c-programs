@@ -28,16 +28,27 @@ static void is_pie() {
 	IS_PIE = 1;
 }
 
-// Adjust vaddr alignment
+// Adjust alignment up
 unsigned long page_align(unsigned long p) {
 	p = (p+PAGE_SIZE-1) & (~(PAGE_SIZE-1));
 	return p;
 }
 
-//Adjust offset alignment
+//Adjust alignment down
 unsigned long page_align_d(unsigned long p) {
 	p = p & (~(PAGE_SIZE-1));
 	return p;
+}
+
+// Virtual size
+void virsz_calc(uint64_t *paddr, uint64_t *pmemsz, uint64_t *pvirsz) {
+
+	const uint64_t addr_begin = page_align_d(*paddr);
+	const uint64_t addr_end   = page_align(*paddr + *pmemsz);
+	const uint64_t virsz      = addr_end - addr_begin;
+
+	*paddr = addr_begin;
+	*pvirsz = virsz;
 }
 
 
@@ -79,6 +90,7 @@ int main(int argc, char *argv[]) {
 
 	char *buffer = (char *)&h;
 	off_t curr_br;
+
 	for (off_t bytes_read=0; bytes_read < 64; ) {
 		curr_br = read(file_descr, buffer + bytes_read, (sizeof(Elf64_Ehdr) - bytes_read));
 		if (curr_br == -1) {
@@ -170,7 +182,6 @@ int main(int argc, char *argv[]) {
 	_Static_assert(sizeof(ph) == 56, "e_ident not 56 bytes");
 	
 	char *buffer_entry = (char *)&ph;
-	off_t curr_entry;
 	off_t desc_loc;
 	for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
 		desc_loc = entries_read * h.e_phentsize + h.e_phoff;
@@ -178,7 +189,7 @@ int main(int argc, char *argv[]) {
 		lseek(file_descr, desc_loc, SEEK_SET);
 	
 		for (off_t bytes_read=0; bytes_read < h.e_phentsize; ) {
-			curr_entry = read(file_descr, buffer_entry + bytes_read, h.e_phentsize - bytes_read);
+			curr_br = read(file_descr, buffer_entry + bytes_read, h.e_phentsize - bytes_read);
 			if (curr_br == -1) {
 				printf("Error reading file\n");
 				return 1;
@@ -195,7 +206,8 @@ int main(int argc, char *argv[]) {
 		// For debug only
 		printf("Processing %jd segment\n", (entries_read+1));
 		// Segment type
-		if (ph.p_type < 1 && ph.p_type > 4) {
+		//if (ph.p_type < 1 && ph.p_type > 4) {
+		if (ph.p_type != 1) {
 			printf("Skipping entry\n");
 			continue;
 		}
@@ -233,32 +245,82 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Adjust offset alignment
-		unsigned long prev = ph.p_offset;
-		ph.p_offset = page_align_d(ph.p_offset);
-		unsigned long diff = prev - ph.p_offset;
-
+		unsigned long adjusted_offset = page_align_d(ph.p_offset);
+		unsigned long diff = ph.p_offset - adjusted_offset;
+		
 		if (diff != 0)
-			printf("Segment offset moved by %lu bytes, from %lu to %" PRIu64 "\n", diff, prev, ph.p_offset);
-	
+			printf("Segment offset moved by %lu bytes, from %lu to %" PRIu64 "\n", diff, ph.p_offset, adjusted_offset);
+		
+		
 		// Adjust vaddr alignment
-		printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
-		ph.p_vaddr += diff;
-		printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
-		ph.p_vaddr = page_align(ph.p_vaddr);
-		printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
+		uint64_t adjusted_vaddr = ph.p_vaddr;
+		uint64_t virsz;
+		virsz_calc(&adjusted_vaddr, &ph.p_memsz, &virsz); 
 
+		
+		unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
+		void* segment_addr = mmap((void *)adjusted_vaddr, virsz, temp_flags, page_flags | MAP_ANONYMOUS, -1, 0);
 
-		void* segment_addr = mmap((void *)ph.p_vaddr, page_align(ph.p_memsz), prot_flags, page_flags, file_descr, ph.p_offset);
 		if (segment_addr == MAP_FAILED) {
 			perror("mmap");
 			printf("Size of the segment: %" PRIu64 "\n",ph.p_memsz);
 			printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
 			printf("Offset in file: %" PRIu64 " \n",ph.p_offset);
+			printf("Allocated size: %" PRIu64 "\n", virsz);
 			return 1;
 		}
-	} 
+		
 	
+		uint64_t segment_end = ph.p_offset + ph.p_filesz;
+		struct stat file_stat;
+		if (fstat(file_descr, &file_stat) == -1) {
+			perror("fstat");
+			return 1;
+		}
+
+		if ((ph.p_offset + ph.p_filesz) > file_stat.st_size) {
+			printf("Exceeding EoF");
+			printf("File size %lld, EoSegment %" PRIu64 "\n", (long long)file_stat.st_size, segment_end);
+			return 1;
+		}
+		
+		printf("Filesz %" PRIu64 "\n", ph.p_filesz);
+
+		char *seg_buf = malloc(ph.p_filesz);
+
+		off_t cu_br;
+		for (off_t br=0; br < ph.p_filesz; ) {
+			cu_br = pread(file_descr, seg_buf + br, ph.p_filesz - br, ph.p_offset + br);
+			if (cu_br == -1) {
+				printf("Error reading file\n");
+				free(seg_buf);
+				seg_buf = NULL;
+			
+				return 1;
+			}
+	
+			if (cu_br == 0) {
+				printf("Unexpected EoF\n");
+				free(seg_buf);
+				seg_buf = NULL;
+
+				return 1;
+			}
+			br += cu_br;
+		}
+		memcpy((void *)ph.p_vaddr, seg_buf, ph.p_filesz);
+
+		if (mprotect(segment_addr, virsz, prot_flags ) == -1) {
+			perror("mprotect");
+			return 1;
+		}
+
+		free(seg_buf);
+		seg_buf = NULL;
+	} 
+
 	void (*entry)() = (void (*)())h.e_entry;
+	fprintf(stderr, "call %p\n", entry);
 	entry();
 	
 	return 0;
