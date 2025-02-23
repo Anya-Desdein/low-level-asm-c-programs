@@ -180,7 +180,61 @@ int main(int argc, char *argv[]) {
 
 	E_phdr ph;
 	_Static_assert(sizeof(ph) == 56, "e_ident not 56 bytes");
-	
+
+	uint64_t highest_addr=0, lowest_addr=0, alloc_len=0;
+	void* total_addr;
+
+	if (IS_PIE == 1){
+		char *buffer_entry = (char *)&ph;
+		off_t desc_loc;
+		for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
+			desc_loc = entries_read * h.e_phentsize + h.e_phoff;
+
+			lseek(file_descr, desc_loc, SEEK_SET);
+		
+			for (off_t bytes_read=0; bytes_read < h.e_phentsize; ) {
+				curr_br = read(file_descr, buffer_entry + bytes_read, h.e_phentsize - bytes_read);
+				if (curr_br == -1) {
+					printf("Error reading file\n");
+					return 1;
+				}
+
+				if (curr_br == 0) {
+					printf("Unexpected EoF\n");
+					return 1;
+				}
+
+				bytes_read += curr_br;
+			}
+		// logic to count together and malloc
+		if (lowest_addr > ph.p_vaddr)
+			lowest_addr = ph.p_vaddr;
+ 		
+		unsigned long seg_highest_addr = ph.p_vaddr + ph.p_memsz;
+		if (highest_addr < seg_highest_addr)
+			highest_addr = seg_highest_addr;
+		}	
+		
+		highest_addr = page_align(highest_addr);
+		lowest_addr = page_align_d(lowest_addr);
+		alloc_len = highest_addr - lowest_addr;
+
+		unsigned int page_flags = 0 | MAP_PRIVATE | MAP_ANONYMOUS;
+		unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
+		total_addr = mmap(NULL, alloc_len, temp_flags, page_flags, -1, 0);
+		
+		if (total_addr == MAP_FAILED) {
+			perror("mmap");
+			printf("Start addr: %" PRIu64 "\n",(unsigned long)total_addr);
+			printf("Allocated size: %" PRIu64 "\n",alloc_len);
+			return 1;
+		}
+		perror("mmap");
+		printf("Start addr: %" PRIu64 "\n",(unsigned long)total_addr);
+		printf("Allocated size: %" PRIu64 "\n",alloc_len);
+
+	}
+
 	char *buffer_entry = (char *)&ph;
 	off_t desc_loc;
 	for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
@@ -229,22 +283,21 @@ int main(int argc, char *argv[]) {
 			prot_flags = PROT_NONE;
 
 		unsigned int page_flags = 0;		
-		IS_PIE = 1; // Delete after differentiating shared library from PIE
-		if (h.e_type == 3 && IS_PIE == 1) 
+		if ((h.e_type == 3 && IS_PIE == 1) || h.e_type == 2) { 
 			page_flags |= MAP_FIXED;
 			page_flags |= MAP_PRIVATE;
-		if (h.e_type == 2) {
-			page_flags |= MAP_FIXED;
-			page_flags |= MAP_PRIVATE;
-		} 
-		
-		// If a segment is of size 0, check flags and handle 
+		}
+
+		// TODO: If a segment is of size 0, check flags and handle 
 		if (ph.p_memsz == 0) { 
 			printf("Skipping segment of size 0\n");
 			continue;
 		}
 
 		// Adjust offset alignment
+		if (h.e_type == 3 && IS_PIE == 1) {
+			
+		}
 		unsigned long adjusted_offset = page_align_d(ph.p_offset);
 		unsigned long diff = ph.p_offset - adjusted_offset;
 		
@@ -318,10 +371,14 @@ int main(int argc, char *argv[]) {
 		free(seg_buf);
 		seg_buf = NULL;
 	} 
-
-	void (*entry)() = (void (*)())h.e_entry;
-	fprintf(stderr, "call %p\n", entry);
-	entry();
 	
+	if (IS_PIE == 1 || ph.p_type == 2) { 
+		void (*entry)() = (void (*)())h.e_entry;
+		entry();
+	
+	} else {
+		printf("Shared object loaded \n");
+	}
+
 	return 0;
 }
