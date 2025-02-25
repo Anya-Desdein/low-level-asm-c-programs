@@ -14,7 +14,7 @@
 
 #include <limits.h>
 
-unsigned long PAGE_SIZE = 0x1000;
+unsigned long PAGE_SIZE = 0x1000ull;
 
 int IS_BIG_ENDIAN = 0;
 int IS_PIE = 0;
@@ -43,14 +43,13 @@ unsigned long page_align_d(unsigned long p) {
 // Virtual size
 void virsz_calc(uint64_t *paddr, uint64_t *pmemsz, uint64_t *pvirsz) {
 
-	const uint64_t addr_begin = page_align_d(*paddr);
+	const uint64_t addr_begin =page_align_d(*paddr);
 	const uint64_t addr_end   = page_align(*paddr + *pmemsz);
 	const uint64_t virsz      = addr_end - addr_begin;
 
 	*paddr = addr_begin;
 	*pvirsz = virsz;
 }
-
 
 int main(int argc, char *argv[]) {
 	if (argc !=2) {
@@ -182,7 +181,7 @@ int main(int argc, char *argv[]) {
 	_Static_assert(sizeof(ph) == 56, "e_ident not 56 bytes");
 
 	uint64_t highest_addr=0, lowest_addr=0, alloc_len=0;
-	void* total_addr;
+	void* total_addr = NULL;
 
 	if (IS_PIE == 1){
 		char *buffer_entry = (char *)&ph;
@@ -223,7 +222,9 @@ int main(int argc, char *argv[]) {
 		unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
 		
 		// Debug!!!!!!!!!!!!!
-		total_addr = mmap("0x5a6b3c11c000", alloc_len, temp_flags, page_flags | MAP_FIXED, -1, 0);
+		uint64_t test_align = 0x2000000;
+		test_align = page_align_d(test_align);
+		total_addr = mmap((void *)test_align, alloc_len, temp_flags, page_flags | MAP_FIXED, -1, 0);
 		// total_addr = mmap(NULL, alloc_len, temp_flags, page_flags, -1, 0);
 		
 		if (total_addr == MAP_FAILED) {
@@ -301,7 +302,8 @@ int main(int argc, char *argv[]) {
 		unsigned long adjusted_vaddr;
 		// Adjust vaddr for PIE
 		if (h.e_type == 3 && IS_PIE == 1) {
-			adjusted_vaddr =  page_align_d((ph.p_vaddr + (uint64_t)total_addr));
+			printf("%lu + base addr\n", (unsigned long)ph.p_vaddr);
+			adjusted_vaddr =  page_align_d(( (unsigned long)ph.p_vaddr + (unsigned long)total_addr));
 			printf("adjusted_vaddr: %lu\n", adjusted_vaddr);
 		} else {
 			adjusted_vaddr = page_align_d(ph.p_vaddr);
@@ -318,20 +320,29 @@ int main(int argc, char *argv[]) {
 		// Adjust vaddr alignment
 		uint64_t virsz;
 		virsz_calc(&adjusted_vaddr, &ph.p_memsz, &virsz); 
-
+		printf("%lu + base addr\n", (unsigned long)ph.p_vaddr);
 		
-		unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
-		void* segment_addr = mmap((void *)adjusted_vaddr, virsz, temp_flags, page_flags | MAP_ANONYMOUS, -1, 0);
+		void *segment_page_addr = (void*)adjusted_vaddr;
+		if (!IS_PIE) {
+			unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
+			segment_page_addr = mmap((void *)adjusted_vaddr, virsz,
+						 temp_flags, page_flags | MAP_ANONYMOUS, -1, 0);
 
-		if (segment_addr == MAP_FAILED) {
-			perror("mmap");
-			printf("Size of the segment: %" PRIu64 "\n",ph.p_memsz);
-			printf("Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
-			printf("Offset in file: %" PRIu64 " \n",ph.p_offset);
-			printf("Allocated size: %" PRIu64 "\n", virsz);
-			return 1;
+			printf("%lu + base addr\n", (unsigned long)ph.p_vaddr);
+			if (segment_page_addr == MAP_FAILED) {
+				perror("mmap");
+				fprintf(stderr, "Size of the segment: %" PRIu64 "\n",ph.p_memsz);
+				fprintf(stderr, "Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
+				fprintf(stderr, "Offset in file: %" PRIu64 " \n",ph.p_offset);
+				fprintf(stderr, "Allocated size: %" PRIu64 "\n", virsz);
+				return 1;
+			}
 		}
-		
+
+		fprintf(stderr, "Size of the segment: %" PRIu64 "\n",ph.p_memsz);
+		fprintf(stderr, "Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
+		fprintf(stderr, "Offset in file: %" PRIu64 " \n",ph.p_offset);
+		fprintf(stderr, "Allocated size: %" PRIu64 "\n", virsz);
 	
 		uint64_t segment_end = ph.p_offset + ph.p_filesz;
 		struct stat file_stat;
@@ -370,19 +381,24 @@ int main(int argc, char *argv[]) {
 			}
 			br += cu_br;
 		}
-		memcpy((void *)ph.p_vaddr, seg_buf, ph.p_filesz);
 
-		if (mprotect(segment_addr, virsz, prot_flags ) == -1) {
+		// Copy segment data from ELF into allocated page.
+		void *segment_addr = (void*)ph.p_vaddr;
+		if (IS_PIE)
+			segment_addr = (void*)((uint64_t)segment_addr + total_addr);
+		memcpy(segment_addr, seg_buf, ph.p_filesz);
+
+		if (mprotect(segment_page_addr, virsz, prot_flags ) == -1) {
 			perror("mprotect");
 			return 1;
 		}
 
 		free(seg_buf);
 		seg_buf = NULL;
-	} 
+	}
 	
 	if (IS_PIE == 1 || ph.p_type == 2) { 
-		void (*entry)() = (void (*)())h.e_entry;
+		void (*entry)() = (void (*)())(h.e_entry + (uint64_t)total_addr);
 		entry();
 	
 	} else {
