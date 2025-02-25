@@ -221,7 +221,10 @@ int main(int argc, char *argv[]) {
 
 		unsigned int page_flags = 0 | MAP_PRIVATE | MAP_ANONYMOUS;
 		unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
-		total_addr = mmap(NULL, alloc_len, temp_flags, page_flags, -1, 0);
+		
+		// Debug!!!!!!!!!!!!!
+		total_addr = mmap("0x5a6b3c11c000", alloc_len, temp_flags, page_flags | MAP_FIXED, -1, 0);
+		// total_addr = mmap(NULL, alloc_len, temp_flags, page_flags, -1, 0);
 		
 		if (total_addr == MAP_FAILED) {
 			perror("mmap");
@@ -229,10 +232,10 @@ int main(int argc, char *argv[]) {
 			printf("Allocated size: %" PRIu64 "\n",alloc_len);
 			return 1;
 		}
-		perror("mmap");
+		printf("PIE alloc\n");
 		printf("Start addr: %" PRIu64 "\n",(unsigned long)total_addr);
 		printf("Allocated size: %" PRIu64 "\n",alloc_len);
-
+			
 	}
 
 	char *buffer_entry = (char *)&ph;
@@ -294,10 +297,17 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 
-		// Adjust offset alignment
+		
+		unsigned long adjusted_vaddr;
+		// Adjust vaddr for PIE
 		if (h.e_type == 3 && IS_PIE == 1) {
-			
+			adjusted_vaddr =  page_align_d((ph.p_vaddr + (uint64_t)total_addr));
+			printf("adjusted_vaddr: %lu\n", adjusted_vaddr);
+		} else {
+			adjusted_vaddr = page_align_d(ph.p_vaddr);
 		}
+
+		// Adjust offset, calc diff
 		unsigned long adjusted_offset = page_align_d(ph.p_offset);
 		unsigned long diff = ph.p_offset - adjusted_offset;
 		
@@ -306,7 +316,6 @@ int main(int argc, char *argv[]) {
 		
 		
 		// Adjust vaddr alignment
-		uint64_t adjusted_vaddr = ph.p_vaddr;
 		uint64_t virsz;
 		virsz_calc(&adjusted_vaddr, &ph.p_memsz, &virsz); 
 
