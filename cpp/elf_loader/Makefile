@@ -2,46 +2,56 @@ SHELL = /bin/sh
 
 .PHONY: load
 
+### Disable implicit rules
 .SUFFIXES:
-CC := gcc
-CG := clang
+##########################
 
-# Assembly
-INT = example.s
-ATT = example_att.s
-OBJ = example.o
+CC := clang
+
+# Common AT&T compilation flags
+FLAGS = -nostartfiles -Wl,--no-dynamic-linker -g -o 
+
+# Test assembly files
+NASM = example
+ATT = example_att
+PIE = example_pie
+
+# ELF compilation flags
+ELF_FLAGS = -g3 -ggdb -fsanitize=address
 
 # Loader
-LOD = elf_loader.c
+LOD = elf_loader
 
 
 all: load
 
-### TEST FILES
-# Non-PIE
-example: $(OBJ)
-	ld -o example example.o
-$(OBJ): $(INT)
-	nasm -f elf64 example.s -o example.o	
+### Generate ELFs for Testing
 
-example_att: $(ATT)
-	$(CC) -no-pie -nostartfiles -Wl,--no-dynamic-linker -g -o $@ $<
+# Nasm non-PIE
+$(NASM): $(NASM).o
+	ld -o $(NASM) $(NASM).o
+$(NASM).o: $(NASM).s
+	nasm -f elf64 $(NASM).s -o $(NASM).o	
+
+# AT&T non-PIE
+$(ATT): $(ATT).s
+	$(CC) -no-pie $(FLAGS) $@ $<
 
 
-# PIE
-example_pie: $(ATT)
-	$(CC) -nostartfiles -Wl,--no-dynamic-linker -g -o $@ $<
+# AT&T PIE
+$(PIE): $(ATT).s
+	$(CC) $(FLAGS) $@ $<
 
-### LOADER BUILD
-elf_loader: $(LOD) 
-	$(CG) $(LOD) -o elf_loader -O0 -g
+### ELF LOADER BUILD
+$(LOD): $(LOD).c 
+	$(CC) $(LOD).c -o $(LOD) $(ELF_FLAGS)
 
 ### LOAD
-load: elf_loader example example_att example_pie
-	./elf_loader example
-	./elf_loader example_att
-	./elf_loader example_pie
+load: $(LOD) $(NASM) $(ATT) $(PIE)
+	./$(LOD) $(NASM)
+	./$(LOD) $(ATT)
+	./$(LOD) $(PIE)
 
 # Clean
 clean:
-	rm -f elf_loader example example_att example_pie example.o
+	rm -f $(LOD) $(ATT) $(PIE) $(NASM) $(NASM).o
