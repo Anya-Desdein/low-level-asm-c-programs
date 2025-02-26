@@ -1,10 +1,6 @@
 SHELL = /bin/sh
 
-.PHONY: load comp compt compe
-
-### Disable implicit rules
-.SUFFIXES:
-##########################
+.PHONY: load comp compt compe clean
 
 CC := clang
 
