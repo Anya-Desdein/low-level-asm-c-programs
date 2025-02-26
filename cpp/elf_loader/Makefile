@@ -1,6 +1,6 @@
 SHELL = /bin/sh
 
-.PHONY: load
+.PHONY: load comp compt compe
 
 ### Disable implicit rules
 .SUFFIXES:
@@ -26,7 +26,6 @@ LOD = elf_loader
 all: load
 
 ### Generate ELFs for Testing
-
 # Nasm non-PIE
 $(NASM): $(NASM).o
 	ld -o $(NASM) $(NASM).o
@@ -36,7 +35,6 @@ $(NASM).o: $(NASM).s
 # AT&T non-PIE
 $(ATT): $(ATT).s
 	$(CC) -no-pie $(FLAGS) $@ $<
-
 
 # AT&T PIE
 $(PIE): $(ATT).s
@@ -52,6 +50,16 @@ load: $(LOD) $(NASM) $(ATT) $(PIE)
 	./$(LOD) $(ATT)
 	./$(LOD) $(PIE)
 
-# Clean
+
+###### Compile, but NOT TEST
+comp: $(LOD) $(NASM) $(ATT) $(PIE)
+
+##### Compile TEST FILES only
+compt: $(NASM) $(ATT) $(PIE)
+
+##### Compile ELF only
+compe: $(LOD)
+
+###### Clean
 clean:
 	rm -f $(LOD) $(ATT) $(PIE) $(NASM) $(NASM).o
