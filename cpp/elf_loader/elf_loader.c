@@ -14,15 +14,13 @@
 
 #include <limits.h>
 
-unsigned long PAGE_SIZE = 0x1000ull;
-
-int IS_BIG_ENDIAN = 0;
-int IS_PIE = 0;
+unsigned long long PAGE_SIZE = 0x1000ull;
 
 static void clfl(int *file_descr) {
 	close(*file_descr);
 }
 
+int IS_PIE = 0;
 static void is_pie() {
 	// TODO: find how to differentiate PIE from shared object
 	IS_PIE = 1;
@@ -33,11 +31,36 @@ unsigned long page_align(unsigned long p) {
 	p = (p+PAGE_SIZE-1) & (~(PAGE_SIZE-1));
 	return p;
 }
-
 //Adjust alignment down
 unsigned long page_align_d(unsigned long p) {
 	p = p & (~(PAGE_SIZE-1));
 	return p;
+}
+
+int read_usys(int* file_descr, char* buffer, off_t* bytes2read, uint64_t offset) {
+	off_t curr_br, bytesread;
+	for (bytesread=0; bytesread < *bytes2read; ) {
+		if (offset == 0) {
+			curr_br = read(*file_descr, buffer + bytesread, *bytes2read - bytesread);
+		} else {
+			curr_br = pread(*file_descr, buffer + bytesread, *bytes2read - bytesread, offset + bytesread);
+		}
+
+		printf("Desc %d, buffer %d, lenght %llu, offset %" PRIu64 "\n", *file_descr, *buffer, (unsigned long long)bytes2read, offset);
+		if (curr_br == -1) {
+			printf("Error reading file\n");
+			return 1;
+		}
+
+		if (curr_br == 0) {
+			printf("Unexpected EoF\n");
+			return 1;
+		}
+
+		bytesread += curr_br;
+	}
+
+	return 0;
 }
 
 // Virtual size
@@ -63,7 +86,6 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	ssize_t bytes_read;
 	unsigned char e_magic[] = {0x7f, 0x45, 0x4c, 0x46};
 
 	// ELF Header 
@@ -87,34 +109,20 @@ int main(int argc, char *argv[]) {
 	Elf64_Ehdr h;
 	_Static_assert(sizeof(Elf64_Ehdr) == 64, "e_header not 64 bytes");
 
-	char *buffer = (char *)&h;
-	off_t curr_br;
+	char *buf = (char *) &h;
+	off_t bsize = sizeof(Elf64_Ehdr);
+	// Read Elf Header
+	int re = read_usys(&file_descr, buf, &bsize, 0);
+	if (re == 1)
+		return 1;
 
-	for (off_t bytes_read=0; bytes_read < 64; ) {
-		curr_br = read(file_descr, buffer + bytes_read, (sizeof(Elf64_Ehdr) - bytes_read));
-		if (curr_br == -1) {
-			printf("Error reading file\n");
-			return 1;
-		}
-
-		if (curr_br == 0) {
-			printf("Unexpected EoF\n");
-			return 1;
-		}
-
-		bytes_read += curr_br;
-	}
-	
 	for (int i=0; i<(sizeof(e_magic)/sizeof(e_magic[0])); i++) {
-		printf("%c", h.e_ident[i]);
-				
 		if(e_magic[i] != h.e_ident[i]) {
 			puts("");
 			printf("Not an Elf: No Magic\n");
 			return 1;		
 		}
 	}
-	puts("");
 	
 	// Class
 	if (h.e_ident[4] > 2 || h.e_ident[4] < 1) {
@@ -128,8 +136,11 @@ int main(int argc, char *argv[]) {
 		return 1;
 	} 
 	
-	if (h.e_ident[5] == 2)
-		IS_BIG_ENDIAN = 1;
+	// Endianness
+	if (h.e_ident[5] == 2) {
+		printf("Big Endian not supported for now\n");
+		return 1;
+	}
 			
 	// Operating System & ABI
 	if (h.e_ident[7] != 0) {
@@ -142,7 +153,6 @@ int main(int argc, char *argv[]) {
 		printf("File type not supported \n");
 		return 1;
 	}
-
 	if (h.e_type == 3) {
 		printf("Shared object file\n");
 		// Position-independent executables (PIE)
@@ -179,103 +189,95 @@ int main(int argc, char *argv[]) {
 
 	E_phdr ph;
 	_Static_assert(sizeof(ph) == 56, "e_ident not 56 bytes");
+	
+	// For e_type == 2 && e_type == 3
+	off_t desc_loc, entries_read;
 
-	uint64_t highest_addr=0, lowest_addr=0, alloc_len=0;
-	void* total_addr = NULL;
+	buf = (char *)&ph;
+	bsize = sizeof(E_phdr);
 
-	if (IS_PIE == 1){
-		char *buffer_entry = (char *)&ph;
-		off_t desc_loc;
-		for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
+	// Used only for e_type == 3
+	uint64_t lowest_addr=0, highest_addr=0, alloc_size=0;
+	void* alloc_type2_addr = NULL;
+
+	if (h.e_type == 3){
+		// Read Program Headers 
+		for (entries_read=0; entries_read < h.e_phnum; entries_read++) {
 			desc_loc = entries_read * h.e_phentsize + h.e_phoff;
 
 			lseek(file_descr, desc_loc, SEEK_SET);
 		
-			for (off_t bytes_read=0; bytes_read < h.e_phentsize; ) {
-				curr_br = read(file_descr, buffer_entry + bytes_read, h.e_phentsize - bytes_read);
-				if (curr_br == -1) {
-					printf("Error reading file\n");
-					return 1;
-				}
+			re = read_usys(&file_descr, buf, &bsize, 0);
+			if (re) 
+				return 1;
 
-				if (curr_br == 0) {
-					printf("Unexpected EoF\n");
-					return 1;
-				}
-
-				bytes_read += curr_br;
+			// Offset in file
+			if (ph.p_offset < 0) {
+				printf("Incorrect offset: %" PRIu64 "\n", ph.p_offset);
+				return 1;
 			}
-		// logic to count together and malloc
-		if (lowest_addr > ph.p_vaddr)
-			lowest_addr = ph.p_vaddr;
- 		
-		unsigned long seg_highest_addr = ph.p_vaddr + ph.p_memsz;
-		if (highest_addr < seg_highest_addr)
-			highest_addr = seg_highest_addr;
-		}	
 		
+			// Add only Loadable segment sizes
+			if (ph.p_type != 1) {
+				continue;
+			}
+
+
+			// Count pages to allocate for the whole program
+			if (lowest_addr > ph.p_vaddr)
+				lowest_addr = ph.p_vaddr;
+			
+			unsigned long temp_highest_addr = ph.p_vaddr + ph.p_memsz;
+			if (highest_addr < temp_highest_addr)
+				highest_addr = temp_highest_addr;
+		}	
+			
+		// Align to page
 		highest_addr = page_align(highest_addr);
 		lowest_addr = page_align_d(lowest_addr);
-		alloc_len = highest_addr - lowest_addr;
+		alloc_size = highest_addr - lowest_addr;
 
-		unsigned int page_flags = 0 | MAP_PRIVATE | MAP_ANONYMOUS;
-		unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
+		unsigned int temp_page_flags = 0 | MAP_PRIVATE;
+		if(IS_PIE)
+			temp_page_flags |= MAP_ANONYMOUS;
+
+		unsigned int temp_prot_flags = 0 | PROT_READ | PROT_WRITE;
 		
-		// Debug!!!!!!!!!!!!!
-		uint64_t test_align = 0x2000000;
-		test_align = page_align_d(test_align);
-		total_addr = mmap((void *)test_align, alloc_len, temp_flags, page_flags | MAP_FIXED, -1, 0);
-		// total_addr = mmap(NULL, alloc_len, temp_flags, page_flags, -1, 0);
+		// Let MMU choose the addr, making it random
+		alloc_type2_addr = mmap(NULL, alloc_size, temp_page_flags, temp_page_flags, -1, 0);
 		
-		if (total_addr == MAP_FAILED) {
+		if (alloc_type2_addr == MAP_FAILED) {
 			perror("mmap");
-			printf("Start addr: %" PRIu64 "\n",(unsigned long)total_addr);
-			printf("Allocated size: %" PRIu64 "\n",alloc_len);
+			printf("Start addr: %" PRIu64 "\n",(unsigned long)alloc_type2_addr);
+			printf("Allocated size: %" PRIu64 "\n",alloc_size);
 			return 1;
 		}
-		printf("PIE alloc\n");
-		printf("Start addr: %" PRIu64 "\n",(unsigned long)total_addr);
-		printf("Allocated size: %" PRIu64 "\n",alloc_len);
-			
 	}
 
-	char *buffer_entry = (char *)&ph;
-	off_t desc_loc;
-	for (off_t entries_read=0; entries_read < h.e_phnum; entries_read++) {
+	// Read Program headers 
+	for (entries_read=0; entries_read < h.e_phnum; entries_read++) {
 		desc_loc = entries_read * h.e_phentsize + h.e_phoff;
 
 		lseek(file_descr, desc_loc, SEEK_SET);
 	
-		for (off_t bytes_read=0; bytes_read < h.e_phentsize; ) {
-			curr_br = read(file_descr, buffer_entry + bytes_read, h.e_phentsize - bytes_read);
-			if (curr_br == -1) {
-				printf("Error reading file\n");
-				return 1;
-			}
-
-			if (curr_br == 0) {
-				printf("Unexpected EoF\n");
-				return 1;
-			}
-
-			bytes_read += curr_br;
-		}
+		re = read_usys(&file_descr, buf, &bsize, 0);
+		if (re) 
+			return 1;
 	
-		// For debug only
-		printf("Processing %jd segment\n", (entries_read+1));
-		// Segment type
-		//if (ph.p_type < 1 && ph.p_type > 4) {
-		if (ph.p_type != 1) {
-			printf("Skipping entry\n");
-			continue;
-		}
-
-		// Offset in file
+		// Negative offset
 		if (ph.p_offset < 0) {
 			printf("Incorrect offset: %" PRIu64 "\n", ph.p_offset);
 			return 1;
 		}
 	
+		// Segment not loadable
+		if (ph.p_type != 1) {
+			continue;
+		}
+		// Segment size 0
+		if (ph.p_memsz == 0) 
+			continue;
+
 		unsigned int prot_flags = 0;
 		if (ph.p_flags & 0x04)
 			prot_flags |= PROT_READ;
@@ -285,26 +287,13 @@ int main(int argc, char *argv[]) {
 			prot_flags |= PROT_EXEC;
 		if (ph.p_flags == 0)
 			prot_flags = PROT_NONE;
-
-		unsigned int page_flags = 0;		
-		if ((h.e_type == 3 && IS_PIE == 1) || h.e_type == 2) { 
-			page_flags |= MAP_FIXED;
-			page_flags |= MAP_PRIVATE;
-		}
-
-		// TODO: If a segment is of size 0, check flags and handle 
-		if (ph.p_memsz == 0) { 
-			printf("Skipping segment of size 0\n");
-			continue;
-		}
-
+		
+		unsigned int page_flags = 0 | MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS;
 		
 		unsigned long adjusted_vaddr;
-		// Adjust vaddr for PIE
-		if (h.e_type == 3 && IS_PIE == 1) {
-			printf("%lu + base addr\n", (unsigned long)ph.p_vaddr);
-			adjusted_vaddr =  page_align_d(( (unsigned long)ph.p_vaddr + (unsigned long)total_addr));
-			printf("adjusted_vaddr: %lu\n", adjusted_vaddr);
+		// Adjust vaddr for Shared Object && PIE
+		if (h.e_type == 3) {
+			adjusted_vaddr =  page_align_d(( (unsigned long)ph.p_vaddr + (unsigned long)alloc_type2_addr));
 		} else {
 			adjusted_vaddr = page_align_d(ph.p_vaddr);
 		}
@@ -313,22 +302,26 @@ int main(int argc, char *argv[]) {
 		unsigned long adjusted_offset = page_align_d(ph.p_offset);
 		unsigned long diff = ph.p_offset - adjusted_offset;
 		
-		if (diff != 0)
-			printf("Segment offset moved by %lu bytes, from %lu to %" PRIu64 "\n", diff, ph.p_offset, adjusted_offset);
-		
-		
 		// Adjust vaddr alignment
 		uint64_t virsz;
 		virsz_calc(&adjusted_vaddr, &ph.p_memsz, &virsz); 
-		printf("%lu + base addr\n", (unsigned long)ph.p_vaddr);
+		
+		char *buff = malloc(ph.p_filesz); // For memcpy 
 		
 		void *segment_page_addr = (void*)adjusted_vaddr;
-		if (!IS_PIE) {
+		
+		// MMAP regions only for Executable File
+		if (h.e_type == 2) {
 			unsigned int temp_flags = 0 | PROT_READ | PROT_WRITE;
-			segment_page_addr = mmap((void *)adjusted_vaddr, virsz,
-						 temp_flags, page_flags | MAP_ANONYMOUS, -1, 0);
+			segment_page_addr = mmap(
+				(void *)adjusted_vaddr, 
+				virsz,
+				temp_flags, 
+				page_flags, 
+				-1,
+				0
+			);
 
-			printf("%lu + base addr\n", (unsigned long)ph.p_vaddr);
 			if (segment_page_addr == MAP_FAILED) {
 				perror("mmap");
 				fprintf(stderr, "Size of the segment: %" PRIu64 "\n",ph.p_memsz);
@@ -337,72 +330,37 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr, "Allocated size: %" PRIu64 "\n", virsz);
 				return 1;
 			}
-		}
-
-		fprintf(stderr, "Size of the segment: %" PRIu64 "\n",ph.p_memsz);
-		fprintf(stderr, "Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
-		fprintf(stderr, "Offset in file: %" PRIu64 " \n",ph.p_offset);
-		fprintf(stderr, "Allocated size: %" PRIu64 "\n", virsz);
-	
-		uint64_t segment_end = ph.p_offset + ph.p_filesz;
-		struct stat file_stat;
-		if (fstat(file_descr, &file_stat) == -1) {
-			perror("fstat");
-			return 1;
-		}
-
-		if ((ph.p_offset + ph.p_filesz) > file_stat.st_size) {
-			printf("Exceeding EoF");
-			printf("File size %lld, EoSegment %" PRIu64 "\n", (long long)file_stat.st_size, segment_end);
-			return 1;
-		}
 		
-		printf("Filesz %" PRIu64 "\n", ph.p_filesz);
-
-		char *seg_buf = malloc(ph.p_filesz);
-
-		off_t cu_br;
-		for (off_t br=0; br < ph.p_filesz; ) {
-			cu_br = pread(file_descr, seg_buf + br, ph.p_filesz - br, ph.p_offset + br);
-			if (cu_br == -1) {
-				printf("Error reading file\n");
-				free(seg_buf);
-				seg_buf = NULL;
-			
-				return 1;
-			}
-	
-			if (cu_br == 0) {
-				printf("Unexpected EoF\n");
-				free(seg_buf);
-				seg_buf = NULL;
-
-				return 1;
-			}
-			br += cu_br;
+			uint64_t segment_end = ph.p_offset + ph.p_filesz;
 		}
 
-		// Copy segment data from ELF into allocated page.
+		re = read_usys(&file_descr, buff, &bsize, ph.p_offset);
+		if (re) 
+			return 1;
+	
+		// Copy segment from ELF into page
 		void *segment_addr = (void*)ph.p_vaddr;
-		if (IS_PIE)
-			segment_addr = (void*)((uint64_t)segment_addr + total_addr);
-		memcpy(segment_addr, seg_buf, ph.p_filesz);
+		
+		if (h.e_type == 3)
+			segment_addr = (void*)((uint64_t)segment_addr + alloc_type2_addr);
+
+		memcpy(segment_addr, buff, ph.p_filesz);
 
 		if (mprotect(segment_page_addr, virsz, prot_flags ) == -1) {
 			perror("mprotect");
 			return 1;
 		}
 
-		free(seg_buf);
-		seg_buf = NULL;
+		free(buff);
+		buff = NULL;
 	}
 	
-	if (IS_PIE == 1 || ph.p_type == 2) { 
-		void (*entry)() = (void (*)())(h.e_entry + (uint64_t)total_addr);
+	if ((h.e_type == 3 && IS_PIE == 1) || h.e_type == 2) { 
+		void (*entry)() = (void (*)())(h.e_entry + (uint64_t)alloc_type2_addr);
 		entry();
 	
 	} else {
-		printf("Shared object loaded \n");
+		printf("Loaded %s\n", argv[1]);
 	}
 
 	return 0;
