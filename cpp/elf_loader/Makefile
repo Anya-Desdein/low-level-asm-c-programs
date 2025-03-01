@@ -13,7 +13,7 @@ ATT = example_att
 PIE = example_pie
 
 # ELF compilation flags
-ELF_FLAGS = -g3 -ggdb -fsanitize=address
+ELF_FLAGS = -g3 -ggdb
 
 # Loader
 LOD = elf_loader

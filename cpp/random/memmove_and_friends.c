@@ -133,6 +133,36 @@ int main() {
 	memset(strrr+2, 'o', 1);
 	printf("%s\n", strrr);
 
+	union Data {
+		struct {
+			int a;
+			int b;
+		};
+
+		struct {
+			unsigned long long a;
+			unsigned long long b;
+		} verylongdata;
+	} Data;
+
+	union Data data1;
+	data1.a = 10;
+	printf("Signed int: %d\n", data1.a);
+	printf("Unsigned long long: %llu\n", data1.verylongdata.a);
+
+	struct somedata {
+		int a;
+	} somestruct;
+	typedef struct somedata somedata;
+	somestruct.a = 11;
+
+	printf("From somestruct: %d\n", somestruct.a);
+	
+	somedata sm;
+	sm.a = 12;
+
+	printf("From sm: %d\n", sm.a);
+
 	return 0;
 }
 
