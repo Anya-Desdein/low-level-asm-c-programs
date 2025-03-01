@@ -46,7 +46,6 @@ int read_usys(int* file_descr, char* buffer, off_t* bytes2read, uint64_t offset)
 			curr_br = pread(*file_descr, buffer + bytesread, *bytes2read - bytesread, offset + bytesread);
 		}
 
-		printf("Desc %d, buffer %d, lenght %llu, offset %" PRIu64 "\n", *file_descr, *buffer, (unsigned long long)bytes2read, offset);
 		if (curr_br == -1) {
 			printf("Error reading file\n");
 			return 1;
@@ -329,16 +328,25 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr, "Virtual addr: %" PRIu64 "\n",ph.p_vaddr);
 				fprintf(stderr, "Offset in file: %" PRIu64 " \n",ph.p_offset);
 				fprintf(stderr, "Allocated size: %" PRIu64 "\n", virsz);
+			
+				free(buff);
+				buff = NULL;
+		
 				return 1;
 			}
 		
 			uint64_t segment_end = ph.p_offset + ph.p_filesz;
 		}
 
-		re = read_usys(&file_descr, buff, &ph.p_filesz, ph.p_offset);
-		if (re) 
+		re = read_usys(&file_descr, buff, (off_t *)&ph.p_filesz, ph.p_offset);
+		if (re) {
+		
+			free(buff);
+			buff = NULL;
+
 			return 1;
-	
+		}
+		
 		// Copy segment from ELF into page
 		void *segment_addr = (void*)ph.p_vaddr;
 		
@@ -348,6 +356,10 @@ int main(int argc, char *argv[]) {
 		memcpy(segment_addr, buff, ph.p_filesz);
 
 		if (mprotect(segment_page_addr, virsz, prot_flags ) == -1) {
+		
+			free(buff);
+			buff = NULL;
+
 			perror("mprotect");
 			return 1;
 		}
