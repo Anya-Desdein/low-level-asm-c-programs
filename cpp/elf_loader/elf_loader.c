@@ -64,10 +64,10 @@ int read_usys(int* file_descr, char* buffer, off_t* bytes2read, uint64_t offset)
 }
 
 // Virtual size
-void virsz_calc(uint64_t *paddr, uint64_t *pmemsz, uint64_t *pvirsz) {
+void virsz_calc(uint64_t *paddr, uint64_t memsz, uint64_t *pvirsz) {
 
-	const uint64_t addr_begin =page_align_d(*paddr);
-	const uint64_t addr_end   = page_align(*paddr + *pmemsz);
+	const uint64_t addr_begin = page_align_d(*paddr);
+	const uint64_t addr_end   = page_align(*paddr + memsz);
 	const uint64_t virsz      = addr_end - addr_begin;
 
 	*paddr = addr_begin;
@@ -291,6 +291,7 @@ int main(int argc, char *argv[]) {
 		unsigned int page_flags = 0 | MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS;
 		
 		unsigned long adjusted_vaddr;
+
 		// Adjust vaddr for Shared Object && PIE
 		if (h.e_type == 3) {
 			adjusted_vaddr =  page_align_d(( (unsigned long)ph.p_vaddr + (unsigned long)alloc_type2_addr));
@@ -304,7 +305,7 @@ int main(int argc, char *argv[]) {
 		
 		// Adjust vaddr alignment
 		uint64_t virsz;
-		virsz_calc(&adjusted_vaddr, &ph.p_memsz, &virsz); 
+		virsz_calc(&adjusted_vaddr, ph.p_memsz + diff, &virsz); 
 		
 		char *buff = malloc(ph.p_filesz); // For memcpy 
 		
@@ -334,7 +335,7 @@ int main(int argc, char *argv[]) {
 			uint64_t segment_end = ph.p_offset + ph.p_filesz;
 		}
 
-		re = read_usys(&file_descr, buff, &bsize, ph.p_offset);
+		re = read_usys(&file_descr, buff, &ph.p_filesz, ph.p_offset);
 		if (re) 
 			return 1;
 	
