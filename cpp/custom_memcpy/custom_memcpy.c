@@ -24,7 +24,7 @@
 		lfence (load fence / waits for all reads),
 		mfence (both load and store) but does NOT cover register operations
 	
-	Retscp doesn't flush writeback buffer  	
+	Rdtscp doesn't flush writeback buffer  	
 */
 static inline uint32_t* cpuid_gcc() {
 	static uint32_t retvals[3] = {0,0,0};
@@ -133,9 +133,8 @@ static void cmemcpy2(void* const dest, const void* const sorc, const size_t size
 	}
 }
 
-// FINISH THIS
-// Get CPU CLOCK RATE
-static double getclockrate() {
+// Get avg clockrate
+static double getavgclockrate() {
 
 	double clockrate[66];
 	FILE *fp = fopen("/proc/cpuinfo", "r");
@@ -158,13 +157,9 @@ static double getclockrate() {
 
 		char * a = pos + 1;
 		clockrate[iter] = strtod(a, NULL);	
-		printf("Clockrate: %f\n", clockrate[iter]);
-		
 		iter ++;
 	}
 	
-	
-	printf("%d\n", iter);
 	double sum = 0;
 	for (int i=0; i<iter; i++) {
 		printf("Clockrate: %f\n", clockrate[i]);
@@ -207,12 +202,20 @@ int main() {
 	// Not even a text
 	long long int text3 = 6666666666;
 	
+	// Ended up useless, but good learning experience
+	double avgclock = getavgclockrate();	
+	printf("Clockrate: %f\n", avgclock);
+
+
 	// Test rdtscp and cpuid
 	uint32_t *cpuid_ret = cpuid_gcc();
 	if (cpuid_ret[1] == 0 || cpuid_ret[2] == 0) {
 		printf("No invariant tsc or rdtscp\n");
 		return 0;
 	}
+	
+
+	cpuid();
 	
 	uint64_t rdtscp1__ = rdtscp();
 	printf("RDTSCP1: %" PRIu64 "\n", rdtscp1__);
@@ -231,10 +234,6 @@ int main() {
 	uint64_t rdtscp2_ = rdtscp();
 	
 	cpuid();
-	
-	double clock = getclockrate();	
-	printf("Clockrate: %f\n", clock);
-
 
 	free(dest);
 	return 0;
