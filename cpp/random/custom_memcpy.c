@@ -4,7 +4,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void cmemcpy(void* dest, const void* sorc, size_t size) {
+#include <stdint.h>
+
+#include <time.h>
+#include <x86intrin.h> // rdtscp and cpuid
+
+static inline uint64_t rdtscp() {
+	
+	uint32_t eax=0;
+
+	asm volatile( 
+		"cpuid"
+		: "=a" (eax)	      // output
+		: "a"  (eax)	      // input
+		: "ebx", "ecx", "edx" // clobbered registers
+	);
+	return 12;
+}
+
+static void cmemcpy(void* dest, const void* sorc, size_t size) {
 	
 	char * dst = (char *)dest;
 	char * src = (char *)sorc;
@@ -14,7 +32,7 @@ void cmemcpy(void* dest, const void* sorc, size_t size) {
 	
 }
 
-void cmemcpy2(void* const dest, const void* const sorc, const size_t size) {
+static void cmemcpy2(void* const dest, const void* const sorc, const size_t size) {
 
 	const size_t divisor      = sizeof(long long int);
 	const size_t numberofints = size/divisor;
@@ -42,6 +60,7 @@ void cmemcpy2(void* const dest, const void* const sorc, const size_t size) {
 }
 
 
+
 int main() {
 	char *dest = malloc(888);
 
@@ -57,5 +76,25 @@ int main() {
 	cmemcpy(dest2, &copyme, size2);
 
 	printf("%s", dest);
+
+	// Let's measure perf, shall we?
+	char *test1 = malloc(666);
+	char *test2 = malloc(666);
+	char *test3 = malloc(666);
+	char *test4 = malloc(666);
+	char *test5 = malloc(666);
+	char *test6 = malloc(666);
+	
+	char text1[] = "This is the text I want you to copy for me";
+	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
+	
+	// Not even a text
+	long long int text3 = 6666666666;
+	
+	uint64_t rdtscp1 = rdtscp();
+
+	cmemcpy(test1, text1, sizeof(text1));
+
+	free(dest);
 	return 0;
 }
