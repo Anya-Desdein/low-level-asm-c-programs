@@ -16,8 +16,6 @@ low_level_asm_c_programs/
 │   └── random/
 │       └── (other miscellaneous programs)
 └── nasm/
-├── cpuidleaf/
-│   └── (CPUID leaf reader)
-└── line_reader/
-    └── (command-line line reader)
+    └── cpuidleaf (CPUID leaf reader)
+    └── line reader (command-line line reader)
 
