@@ -8,9 +8,10 @@
 #include <inttypes.h>
 
 #include <time.h>
-#include <x86intrin.h> // rdtscp and cpuid
-#include <cpuid.h> // __get_cpuid from gcc extension as an alternative
-#include <immintrin.h> // __rdtscp from intel intrinsics
+#include <x86intrin.h> 	// rdtscp and cpuid
+#include <cpuid.h> 	// __get_cpuid from gcc extension as an alternative
+#include <immintrin.h>  // __rdtscp from intel intrinsics
+
 
 /* 	Calling CPUID to be used as a barrier
 	It has a side effect of serializing instruction stream, 
@@ -23,12 +24,36 @@
 		lfence (load fence / waits for all reads),
 		mfence (both load and store) but does NOT cover register operations
 	
+	Retscp doesn't flush writeback buffer  	
 */
-// gcc ext
-static inline void cpuid_gcc() {
-	uint32_t eax, ebx, ecx, edx;
-	__get_cpuid(0, &eax, &ebx, &ecx, &edx);
+static inline uint32_t* cpuid_gcc() {
+	static uint32_t retvals[3] = {0,0,0};
+
+	uint32_t eax, ebx, ecx, edx, max_leaf, has_rdtscp, has_invariant_tsc;
+	__get_cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
+	max_leaf = eax;
+	retvals[0] = max_leaf;
+	printf("Max leaf: %" PRIu32 "\n",max_leaf);
 	
+	if (max_leaf <= 0x80000001)
+		return retvals;
+
+	eax = 0, ebx = 0, ecx = 0, edx = 0;
+	__get_cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
+ 	has_rdtscp = edx & (1 << 27);
+	retvals[1] = has_rdtscp;
+	printf("Has rdtscp: %" PRIu32 "\n",has_rdtscp);
+	
+	if (max_leaf <= 0x80000007)
+		return retvals;
+
+	eax = 0, ebx = 0, ecx = 0, edx = 0;
+	__get_cpuid(0x80000007, &eax, &ebx, &ecx, &edx);
+	has_invariant_tsc = edx & (1 << 8); 
+	retvals[2] = has_invariant_tsc;
+	printf("Has invariant tsc: %" PRIu32 "\n", has_invariant_tsc);
+
+	return retvals;
 }
 static inline void cpuid() {
 		
@@ -42,7 +67,6 @@ static inline void cpuid() {
 	);
 }
 
-// intel intrinsic
 static inline uint64_t rdtscp_intel() {
 		
 	int64_t rdtscp;
@@ -61,7 +85,7 @@ static inline uint64_t rdtscp() {
 		"rdtscp"
 		: "=a" (eax), "=d" (edx) // out
 		:			 // in
-		: "ecx", "memory"	 // clobbers
+		: "ecx"			 // clobbers
 	);
 
 	// Cast edx to int64_t, then bitwise shift by 32,
@@ -113,25 +137,43 @@ static void cmemcpy2(void* const dest, const void* const sorc, const size_t size
 // Get CPU CLOCK RATE
 static double getclockrate() {
 
-	double clockrate=0;
+	double clockrate[66];
 	FILE *fp = fopen("/proc/cpuinfo", "r");
 	
+	char *pos = NULL;
 	char buffer[4096];
-	char linecon[] = "cpu Mhz"; 
+	int iter = 0;
+	
+	char linecon[] = "cpu MHz"; 
+	char colon[] = ":";
 	while(fgets(buffer, sizeof(buffer), fp) != NULL) {
-		char *pos = strstr( (const char *)&buffer, (const char *)&linecon);
-		
-		if ( pos == NULL)
-			continue;
-		
 
+		pos = strstr(buffer, linecon);
+		if (pos == NULL)
+			continue;
+	
+		pos = strstr(buffer, colon);
+		if (pos == NULL)
+			continue;
+
+		char * a = pos + 1;
+		clockrate[iter] = strtod(a, NULL);	
+		printf("Clockrate: %f\n", clockrate[iter]);
+		
+		iter ++;
+	}
+	
+	
+	printf("%d\n", iter);
+	double sum = 0;
+	for (int i=0; i<iter; i++) {
+		printf("Clockrate: %f\n", clockrate[i]);
+		sum += clockrate[i];
 
 	}
+	double avg = sum/(double)(long long int)iter;
 
-
-
-
-	return clockrate;
+	return avg;
 }
 
 
@@ -166,12 +208,16 @@ int main() {
 	long long int text3 = 6666666666;
 	
 	// Test rdtscp and cpuid
-	cpuid();
-
+	uint32_t *cpuid_ret = cpuid_gcc();
+	if (cpuid_ret[1] == 0 || cpuid_ret[2] == 0) {
+		printf("No invariant tsc or rdtscp\n");
+		return 0;
+	}
+	
 	uint64_t rdtscp1__ = rdtscp();
 	printf("RDTSCP1: %" PRIu64 "\n", rdtscp1__);
 
-	cpuid_gcc();
+	cpuid();
 	
 	uint64_t rdtscp2__ = rdtscp_intel();
 	printf("RDTSCP2: %" PRIu64 "\n", rdtscp2__);
@@ -186,7 +232,9 @@ int main() {
 	
 	cpuid();
 	
-	
+	double clock = getclockrate();	
+	printf("Clockrate: %f\n", clock);
+
 
 	free(dest);
 	return 0;
