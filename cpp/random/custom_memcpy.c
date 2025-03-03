@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -41,7 +42,7 @@ static inline void cpuid() {
 	);
 }
 
-// intel arch intrinsic
+// intel intrinsic
 static inline uint64_t rdtscp_intel() {
 		
 	int64_t rdtscp;
@@ -108,6 +109,30 @@ static void cmemcpy2(void* const dest, const void* const sorc, const size_t size
 	}
 }
 
+// FINISH THIS
+// Get CPU CLOCK RATE
+static double getclockrate() {
+
+	double clockrate=0;
+	FILE *fp = fopen("/proc/cpuinfo", "r");
+	
+	char buffer[4096];
+	char linecon[] = "cpu Mhz"; 
+	while(fgets(buffer, sizeof(buffer), fp) != NULL) {
+		char *pos = strstr( (const char *)&buffer, (const char *)&linecon);
+		
+		if ( pos == NULL)
+			continue;
+		
+
+
+	}
+
+
+
+
+	return clockrate;
+}
 
 
 int main() {
@@ -140,19 +165,28 @@ int main() {
 	// Not even a text
 	long long int text3 = 6666666666;
 	
+	// Test rdtscp and cpuid
 	cpuid();
-	
-	uint64_t rdtscp1 = rdtscp();
-	printf("RDTSCP1: %" PRIu64 "\n", rdtscp1);
+
+	uint64_t rdtscp1__ = rdtscp();
+	printf("RDTSCP1: %" PRIu64 "\n", rdtscp1__);
 
 	cpuid_gcc();
 	
-	uint64_t rdtscp2 = rdtscp_intel();
-	printf("RDTSCP2: %" PRIu64 "\n", rdtscp2);
+	uint64_t rdtscp2__ = rdtscp_intel();
+	printf("RDTSCP2: %" PRIu64 "\n", rdtscp2__);
 
 
+	//  Now lets use those
+	cpuid();
 
+	uint64_t rdtscp1_ = rdtscp();
 	cmemcpy(test1, text1, sizeof(text1));
+	uint64_t rdtscp2_ = rdtscp();
+	
+	cpuid();
+	
+	
 
 	free(dest);
 	return 0;
