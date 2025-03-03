@@ -1,7 +1,5 @@
 SHELL = /bin/sh
 
-SUFFIXES:
-
 CC := gcc
 
 SRC = main.o extern_is_ascii.o extern_cleanup.o extern_append.o
