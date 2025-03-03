@@ -8,7 +8,7 @@
 
 #include <time.h>
 #include <x86intrin.h> // rdtscp and cpuid
-
+#include <cpuid.h> // __get_cpuid from gcc extension as an alternative
 
 /* 	Calling CPUID to be used as a barrier
 	It has a side effect of serializing instruction stream, 
@@ -22,6 +22,12 @@
 		mfence (both load and store) but does NOT cover register operations
 	
 */
+static inline void cpuid_gcc() {
+	uint32_t eax, ebx, ecx, edx;
+	__get_cpuid(0, &eax, &ebx, &ecx, &edx);
+	
+}
+// Without gcc ext
 static inline void cpuid() {
 		
 	uint32_t eax=0;
@@ -108,6 +114,9 @@ int main() {
 	long long int text3 = 6666666666;
 	
 	cpuid();
+
+	cpuid_gcc();
+	
 	uint64_t rdtscp1 = rdtscp();
 
 	cmemcpy(test1, text1, sizeof(text1));
