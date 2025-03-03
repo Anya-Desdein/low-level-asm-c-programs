@@ -26,6 +26,19 @@
 	
 	Rdtscp doesn't flush writeback buffer  	
 */
+static inline void cpuid() {
+		
+	uint32_t eax=0;
+
+	asm volatile( 
+		"cpuid"
+		: "=a" (eax)	      // output
+		: "a"  (eax)	      // input
+		: "ebx", "ecx", "edx" // clobbered registers
+	);
+}
+
+// This evolved over time into a function that checks both rdtscp and invariant_tsc
 static inline uint32_t* cpuid_gcc() {
 	static uint32_t retvals[3] = {0,0,0};
 
@@ -54,17 +67,6 @@ static inline uint32_t* cpuid_gcc() {
 	printf("Has invariant tsc: %" PRIu32 "\n", has_invariant_tsc);
 
 	return retvals;
-}
-static inline void cpuid() {
-		
-	uint32_t eax=0;
-
-	asm volatile( 
-		"cpuid"
-		: "=a" (eax)	      // output
-		: "a"  (eax)	      // input
-		: "ebx", "ecx", "edx" // clobbered registers
-	);
 }
 
 static inline uint64_t rdtscp_intel() {
