@@ -8,9 +8,9 @@ low_level_asm_c_programs/
 │   ├── custom_memcpy/
 │   │   └── (custom implementations of memcpy and performance measurement)
 │   ├── elf_loader/
-│   │   └── (ELF loaders and readers)
+│   │   └── (ELF loaders & readers)
 │   ├── makefile/
-│   │   └── (projects testing GNU Make with some nested folders)
+│   │   └── (projects testing GNU Make)
 │   ├── preprocessor/
 │   │   └── (preprocessor macros like VA_OPT and VA_ARGS)
 │   └── random/
@@ -19,5 +19,5 @@ low_level_asm_c_programs/
 ├── cpuidleaf/
 │   └── (CPUID leaf reader)
 └── line_reader/
-    └── (command-line line reader that prints results)
+    └── (command-line line reader)
 
