@@ -1,0 +1,23 @@
+# Low Level ASM C Programs
+
+This repository contains various low-level assembly and C programs organized into two main directories: `cpp` and `nasm`. Below is an overview of the folder structure and the purpose of each directory.
+
+## Directory Structure
+low_level_asm_c_programs/
+├── cpp/
+│   ├── custom_memcpy/
+│   │   └── (custom implementations of memcpy and performance measurement)
+│   ├── elf_loader/
+│   │   └── (ELF loaders and readers)
+│   ├── makefile/
+│   │   └── (projects testing GNU Make with some nested folders)
+│   ├── preprocessor/
+│   │   └── (preprocessor macros like VA_OPT and VA_ARGS)
+│   └── random/
+│       └── (other miscellaneous programs)
+└── nasm/
+├── cpuidleaf/
+│   └── (CPUID leaf reader)
+└── line_reader/
+    └── (command-line line reader that prints results)
+
