@@ -1,10 +1,10 @@
 // Custom implementation of memcpy
-// Attempt 1
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <stdint.h>
+#include <inttypes.h>
 
 #include <time.h>
 #include <x86intrin.h> // rdtscp and cpuid
@@ -41,7 +41,24 @@ static inline void cpuid() {
 }
 
 static inline uint64_t rdtscp() {
-	return 12;
+		
+	// edx = higher bits
+	// eax = lower bits
+	uint32_t eax, edx;
+
+	asm volatile(
+		"rdtscp"
+		: "=a" (eax), "=d" (edx) // out
+		:			 // in
+		: "ecx", "memory"	 // clobbers
+	);
+
+	// Cast edx to int64_t, then bitwise shift by 32,
+	// Next OR with eax
+	
+	// 32:32
+	// edx:eax
+	return (int64_t)edx << 32 | eax;
 }
 
 static void cmemcpy(void* dest, const void* sorc, size_t size) {
@@ -114,10 +131,12 @@ int main() {
 	long long int text3 = 6666666666;
 	
 	cpuid();
+	
+	uint64_t rdtscp1 = rdtscp();
+	printf("RDTSCP1: %" PRIu64 "\n", rdtscp1);
 
 	cpuid_gcc();
 	
-	uint64_t rdtscp1 = rdtscp();
 
 	cmemcpy(test1, text1, sizeof(text1));
 

@@ -1,17 +1,20 @@
 SHELL = /bin/sh
 
-.PHONY: clean
+.PHONY: run clean
 
 CC := gcc
 
-FLAGS = -O1 -fno-strict-aliasing -fno-tree-dce
+FLAGS = -O1 -fno-strict-aliasing -fno-tree-dcei -march=native
 
 SRC = custom_memcpy
 
-all : custom_memcpy
+all : run
 
-custom_memcpy: $(SRC).c
+$(SRC): $(SRC).c
 	$(CC) $(SRC).c -o $(SRC)
+
+run: $(SRC)
+	./$(SRC)
 
 clean:
 	rm -f custom_memcpy
