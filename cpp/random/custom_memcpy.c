@@ -9,8 +9,21 @@
 #include <time.h>
 #include <x86intrin.h> // rdtscp and cpuid
 
-static inline uint64_t rdtscp() {
+
+/* 	Calling CPUID to be used as a barrier
+	It has a side effect of serializing instruction stream, 
+	which means that it ensures that all preceding instructions 
+	are completed before execution.
+
+	It might be slower than fences.
+	Fences:
+		sfence (store fence), 
+		lfence (load fence / waits for all reads),
+		mfence (both load and store) but does NOT cover register operations
 	
+*/
+static inline void cpuid() {
+		
 	uint32_t eax=0;
 
 	asm volatile( 
@@ -19,6 +32,9 @@ static inline uint64_t rdtscp() {
 		: "a"  (eax)	      // input
 		: "ebx", "ecx", "edx" // clobbered registers
 	);
+}
+
+static inline uint64_t rdtscp() {
 	return 12;
 }
 
@@ -91,6 +107,7 @@ int main() {
 	// Not even a text
 	long long int text3 = 6666666666;
 	
+	cpuid();
 	uint64_t rdtscp1 = rdtscp();
 
 	cmemcpy(test1, text1, sizeof(text1));
