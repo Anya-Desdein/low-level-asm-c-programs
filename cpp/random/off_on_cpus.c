@@ -9,30 +9,38 @@
 #include <inttypes.h>
 
 #include <linux/limits.h>
+int pleaseleave() {	
+	printf("Usage:\n\toocpu list,\n\toocpu on CPU_NUM,\n\toocpu off CPU_NUM\n");
+	return 1;
+}
+
+int plsplspls(int cpus) {
+	printf("Argument cannot exceed TOTAL CPU COUNT(%d)\n", cpus);
+	return 1;
+}
 
 int main(int argc, char *argv[]) {
 	
 	if (argc < 2 || argc > 3) {
-		printf("Usage:\n\toocpu list,\n\toocpu on CPU_NUM,\n\toocpu off CPU_NUM\n");
-		return 1;
+		return pleaseleave();
 	}
 
 	int all_cpus = sysconf(_SC_NPROCESSORS_CONF);		
 	int online_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 		
 	if (strcmp(argv[1],"list") == 0) {
-
-		printf("TOTAL CPU COUNT %d\nONLINE CPU COUNT %d\n", all_cpus, online_cpus);
+		printf("\tTOTAL CPU COUNT %d\n\tONLINE CPU COUNT %d\n", all_cpus, online_cpus);
 		return 0;
 	}
 
 	if (argc < 3) {
-		printf("Usage:\n\toocpu list,\n\toocpu on CPU_NUM,\n\toocpu off CPU_NUM\n");
-		return 1;
+		return pleaseleave();
 	}
 
 	// Create correct path to a file managing core state (on/off)
 	int cpu_num = atoi(argv[2]);
+	cpu_num --;
+
 	char str[] = "/sys/devices/system/cpu/cpu%d/online";
 	char buffer[PATH_MAX];
 
@@ -42,9 +50,7 @@ int main(int argc, char *argv[]) {
 	if (strcmp(argv[1],"on") == 0) {
 
 		if (cpu_num > all_cpus) {
-
-			printf("Argument cannot exceed TOTAL CPU COUNT(%d)\n", all_cpus);
-			return 1;
+			return plsplspls(all_cpus);
 		}
 	
 		if (cpu_num != 0) { 
@@ -65,9 +71,7 @@ int main(int argc, char *argv[]) {
 	if (strcmp(argv[1],"off") == 0) {
 
 		if (cpu_num > online_cpus) {
-
-			printf("Argument cannot exceed ONLINE CPU COUNT(%d)\n", online_cpus);
-			return 1;
+			return plsplspls(online_cpus);
 		}
 		
 		if (cpu_num != 0) { 
@@ -86,6 +90,5 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	printf("Usage:\n\toocpu list,\n\toocpu on CPU_NUM,\n\toocpu off CPU_NUM\n");
-	return 1;
+	return pleaseleave();
 }
