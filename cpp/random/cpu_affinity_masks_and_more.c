@@ -37,6 +37,7 @@ int main() {
 		return 1;
 	}
 
+	printf("CPU SET MASK:\n");
 	for( int i=0; i<cpuset_size; i++){
 		if ( (CPU_ISSET(i, &cpu_set)) ) {
 			printf("1");
@@ -47,9 +48,10 @@ int main() {
 		if (!((i+1)%4))
 			printf(" ");
 
-		if (!((i+1)%64))
+		if (!((i+1)%48))
 			printf("\n");
 	}
+	printf("\n");
 
 	// int sched_setaffinity(pid, )
 	
