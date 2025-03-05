@@ -26,8 +26,7 @@ int main() {
 	int online_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 	printf("TOTAL CPU COUNT: %d\nCPUs ONLINE: %d\n", all_cpus, online_cpus);
 
-	CPU_ZERO(&cpu_set);		    // clear set and inits struct
-	CPU_SET((online_cpus-1), &cpu_set); // assign last
+	CPU_ZERO(&cpu_set); // clear set and inits struct
 
 	pid_t pid = getpid();
 	printf("CURRENT PROCESS ID: %d\n", (int)pid);
@@ -37,6 +36,8 @@ int main() {
 		return 1;
 	}
 
+	puts("");
+	printf("Before Setting Affinity:\n");
 	printf("CPU SET MASK:\n");
 	for( int i=0; i<cpuset_size; i++){
 		if ( (CPU_ISSET(i, &cpu_set)) ) {
@@ -52,8 +53,37 @@ int main() {
 			printf("\n");
 	}
 	printf("\n");
-
-	// int sched_setaffinity(pid, )
 	
+	CPU_ZERO(&cpu_set); // clear set and inits struct
+	CPU_SET(2, &cpu_set);
+	
+	if (sched_setaffinity(pid, cpuset_size, &cpu_set) == -1) {
+		perror("sched_setaffinity");
+		return 1;
+	}
+
+	if (sched_getaffinity(pid, cpuset_size, &cpu_set) == -1) {
+		perror("sched_getaffinity");
+		return 1;
+	}
+
+	printf("After Setting Affinity:\n");
+	printf("CPU SET MASK:\n");
+	for( int i=0; i<cpuset_size; i++){
+		if ( (CPU_ISSET(i, &cpu_set)) ) {
+			printf("1");
+		} else {
+			printf("0");
+		}
+
+		if (!((i+1)%4))
+			printf(" ");
+
+		if (!((i+1)%48))
+			printf("\n");
+	}
+	printf("\n");
+	
+
 	return 0;
 }
