@@ -1,37 +1,34 @@
-SHELL = /bin/sh
+# This Makefile is to be overwritten by makefile
 
-CC := gcc
+ifeq ("$(V)", "1")
+	Q:=
+else
+	Q:=@
+endif
 
-SRC = main.o extern_is_ascii.o extern_cleanup.o extern_append.o
+.PHONY: test1 test2 test3 test4 test5
 
-OBJ = $(SRC:.c=.o)
+all: test5
 
-EXT = extern_is_ascii.o extern_cleanup.o extern_append.o
+test1:
+	$(Q)echo -e "---------Memory:---------" > readme
+	$(Q)free -h >> readme
+	$(Q)echo -e "----------Disk:----------" >> readme
+	$(Q)df -h >> readme
 
-all: executable executable2 executable3
+test2: test1 
+	$(Q)sed -e 's/1/666/g' -e 's/M/W/g' -e 's/run/makefile magic/g' -e 's/B/p/I2' -e 's/0/-1/g' readme > readme.tmp && mv readme.tmp readme
 
-# Object creation
-%.o: %.c
-	$(CC) -c $< -o $@
+test3: test2
+	$(Q)echo "\n\n--Replace Me--\n\n" >> readme
 
-# Static linking of libraries
-add_ons.a: $(EXT)
-	ar rcs add_ons.a $(EXT)
+test4: test3
+	$(Q)rev readme > readme.tmp && mv readme.tmp readme
+	$(Q)tac readme > readme.tmp && mv readme.tmp readme
 
-# Dynamic linking of libraries
-add_ons.so: $(EXT)
-	$(CC) -o add_ons.so $(EXT) -shared
-
-executable: $(OBJ)
-	$(CC) -o executable $(OBJ)
-
-executable2: main.o add_ons.a
-	$(CC) main.o add_ons.a -o executable2
+test5: test4
+	$(Q)cat readme | lolcat	
 
 
-executable3: main.o add_ons.so
-	$(CC) -o executable3 main.o add_ons.so
-	
-# Clean
 clean:
-	rm -f *.o add_ons.a add_ons.so executable executable2 executable3
+	$(Q)rm -f readme
