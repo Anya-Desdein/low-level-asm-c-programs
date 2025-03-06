@@ -54,8 +54,11 @@ int main() {
 	}
 	printf("\n");
 	
-	CPU_ZERO(&cpu_set); // clear set and inits struct
+	CPU_ZERO(&cpu_set);  // clear set and inits struct
 	CPU_SET(2, &cpu_set);
+	
+	CPU_SET(3, &cpu_set); // Just to practice using this instr
+	CPU_CLR(3, &cpu_set);
 	
 	if (sched_setaffinity(pid, cpuset_size, &cpu_set) == -1) {
 		perror("sched_setaffinity");
