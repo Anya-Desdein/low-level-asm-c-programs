@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
 
 	if (strcmp(argv[1],"off") == 0) {
 		digit = '0';
-
 	}
 
 	if (digit == 9) {

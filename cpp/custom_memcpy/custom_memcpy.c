@@ -1,4 +1,9 @@
-// Custom implementation of memcpy
+#define _GNU_SOURCE 	// GNU-specific extensions like
+			// sched_setaffinity() sched_getaffinity() 
+			// these are not part of standard POSIX API
+
+#include <sched.h>      // Set thread's CPU affinity
+#include <unistd.h> 	// System-related functions like getpid()
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,46 +140,39 @@ static void cmemcpy2(void* const dest, const void* const sorc, const size_t size
 	}
 }
 
-// Get avg clockrate
-static double getavgclockrate() {
-
-	double clockrate[66];
-	FILE *fp = fopen("/proc/cpuinfo", "r");
-	
-	char *pos = NULL;
-	char buffer[4096];
-	int iter = 0;
-	
-	char linecon[] = "cpu MHz"; 
-	char colon[] = ":";
-	while(fgets(buffer, sizeof(buffer), fp) != NULL) {
-
-		pos = strstr(buffer, linecon);
-		if (pos == NULL)
-			continue;
-	
-		pos = strstr(buffer, colon);
-		if (pos == NULL)
-			continue;
-
-		char * a = pos + 1;
-		clockrate[iter] = strtod(a, NULL);	
-		iter ++;
-	}
-	
-	double sum = 0;
-	for (int i=0; i<iter; i++) {
-		printf("Clockrate: %f\n", clockrate[i]);
-		sum += clockrate[i];
-
-	}
-	double avg = sum/(double)(long long int)iter;
-
-	return avg;
-}
-
-
 int main() {
+
+	// PURPOSE OF THIS SECTION: Pin this process to only one core in order to measure performance
+
+	
+	/*
+		I think that I've finally understood how cpu_set mask works
+		Each bit corresponds to a certain CPU and can be 1 or 0
+		
+		It's arranged by their indexes (logical CPU ID)
+		
+		CPU 3 	CPU 2 	CPU 1 	CPU 0
+		 0        1      1       0 
+
+		In this example only CPU 2 and 1 can run the process
+		
+
+
+	*/	
+	cpu_set_t cpu_set; // this is a mask
+	size_t cpuset_size = sizeof(cpu_set);
+	printf("Size of cpu_set mask: %zu bytes\n", sizeof(cpu_set));
+	
+	int all_cpus = sysconf(_SC_NPROCESSORS_CONF);
+	int online_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	printf("Total CPU count: %d, Online: %d\n", all_cpus, online_cpus);
+
+	CPU_ZERO(&cpu_set);		    // clear set and inits struct
+	CPU_SET((online_cpus-1), &cpu_set); // assign last
+
+	pid_t pid = getpid();
+	printf("Current process ID: %d\n", (int)pid);
+
 	char *dest = malloc(888);
 
 	char copymecd[] = "declare p as pointer to function (pointer to function (double, float) returning pointer to void) returning pointer to const pointer to pointer to function() returning int\n";
@@ -204,18 +202,37 @@ int main() {
 	// Not even a text
 	long long int text3 = 6666666666;
 	
-	// Ended up useless, but good learning experience
-	double avgclock = getavgclockrate();	
-	printf("Clockrate: %f\n", avgclock);
-
-
 	// Test rdtscp and cpuid
 	uint32_t *cpuid_ret = cpuid_gcc();
-	if (cpuid_ret[1] == 0 || cpuid_ret[2] == 0) {
+	if (cpuid_ret[2] == 0) {
 		printf("No invariant tsc or rdtscp\n");
 		return 0;
 	}
+
+	if (sched_setaffinity(pid, cpuset_size, &cpu_set) == -1) {
+		perror("sched_setaffinity");
+		return 1;
+	}
 	
+	if (sched_getaffinity(pid, cpuset_size, &cpu_set) == -1) {
+		perror("sched_setaffinity");
+		return 1;
+	}
+	printf("Making sure that affinity was set properly:\n");
+	for (int i=0; i<cpuset_size; i++) {
+		if ( (CPU_ISSET(i, &cpu_set)) ) { 
+			printf("1");
+		} else { 
+			printf("0");
+		}
+		
+		if (!((i+1)%4))
+			printf(" ");
+
+		if (!((i+1)%48))
+			printf("\n");
+	}
+	printf("\n");
 
 	cpuid();
 	
@@ -228,7 +245,6 @@ int main() {
 	printf("RDTSCP2: %" PRIu64 "\n", rdtscp2__);
 
 
-	//  Now lets use those
 	cpuid();
 
 	uint64_t rdtscp1_ = rdtscp();
