@@ -195,6 +195,9 @@ int main() {
 	char *test4 = malloc(666);
 	char *test5 = malloc(666);
 	char *test6 = malloc(666);
+	char *test7 = malloc(666);
+	char *test8 = malloc(666);
+	char *test9 = malloc(666);
 	
 	char text1[] = "This is the text I want you to copy for me";
 	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
@@ -253,13 +256,21 @@ int main() {
 	uint64_t rdtscp4__ = rdtscp_intel();
 
 	cpuid();
+	
+	uint64_t rdtscp1 = rdtscp();
+	memcpy(test7, &text1, stx1);
+	uint64_t rdtscp2 = rdtscp();
+	
+	cpuid();
 
 	uint64_t test1_res =  rdtscp2__ - rdtscp1__;
 	uint64_t test2_res =  rdtscp4__ - rdtscp3__;
+	uint64_t test3_res =  rdtscp2 - rdtscp1;
 
 	printf("TEST NUMERO UNO:\n");
 	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
 	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
+	printf("\tmemcpy (libc): %" PRIu64 "\n", test3_res);
 	
 	// Test numero dos
 	cpuid();
@@ -275,13 +286,21 @@ int main() {
 	uint64_t rdtscp8__ = rdtscp_intel();
 
 	cpuid();
+	
+	uint64_t rdtscp3 = rdtscp_intel();
+	cmemcpy(test8, &text2, stx2);
+	uint64_t rdtscp4 = rdtscp_intel();
+
+	cpuid();
 
 	test1_res =  rdtscp6__ - rdtscp5__;
 	test2_res =  rdtscp8__ - rdtscp7__;
+	test3_res =  rdtscp4 - rdtscp3;
 
 	printf("TEST NUMERO DOS:\n");
 	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
 	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
+	printf("\tmemcpy (libc): %" PRIu64 "\n", test3_res);
 
 	// Test numero tres
 	cpuid();
@@ -297,14 +316,21 @@ int main() {
 	uint64_t rdtscp12__ = rdtscp_intel();
 
 	cpuid();
+	
+	uint64_t rdtscp5 = rdtscp_intel();
+	cmemcpy(test9, &text3, stx3);
+	uint64_t rdtscp6 = rdtscp_intel();
+
+	cpuid();
 
 	test1_res =  rdtscp10__ - rdtscp9__;
 	test2_res =  rdtscp12__ - rdtscp11__;
+	test3_res =  rdtscp6 - rdtscp5;
 
 	printf("TEST NUMERO TRES:\n");
 	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
 	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
-
+	printf("\tmemcpy (libc): %" PRIu64 "\n", test3_res);
 
 	cpuid();
 
