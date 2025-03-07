@@ -204,8 +204,8 @@ int main() {
 	
 	// Test rdtscp and cpuid
 	uint32_t *cpuid_ret = cpuid_gcc();
-	if (cpuid_ret[2] == 0) {
-		printf("No invariant tsc or rdtscp\n");
+	if (cpuid_ret[1] == 0) {
+		printf("No rdtscp\n");
 		return 0;
 	}
 
@@ -234,23 +234,78 @@ int main() {
 	}
 	printf("\n");
 
+	size_t stx1 = sizeof(text1);
+	size_t stx2 = sizeof(text2);
+	size_t stx3 = sizeof(text3);
+
+	
+	// Test numero uno
 	cpuid();
 	
 	uint64_t rdtscp1__ = rdtscp();
-	printf("RDTSCP1: %" PRIu64 "\n", rdtscp1__);
-
+	cmemcpy2(test1, &text1, stx1);
+	uint64_t rdtscp2__ = rdtscp();
+	
 	cpuid();
 	
-	uint64_t rdtscp2__ = rdtscp_intel();
-	printf("RDTSCP2: %" PRIu64 "\n", rdtscp2__);
-
+	uint64_t rdtscp3__ = rdtscp_intel();
+	cmemcpy(test2, &text1, stx1);
+	uint64_t rdtscp4__ = rdtscp_intel();
 
 	cpuid();
 
-	uint64_t rdtscp1_ = rdtscp();
-	cmemcpy(test1, text1, sizeof(text1));
-	uint64_t rdtscp2_ = rdtscp();
+	uint64_t test1_res =  rdtscp2__ - rdtscp1__;
+	uint64_t test2_res =  rdtscp4__ - rdtscp3__;
+
+	printf("TEST NUMERO UNO:\n");
+	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
+	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
 	
+	// Test numero dos
+	cpuid();
+	
+	uint64_t rdtscp5__ = rdtscp();
+	cmemcpy2(test3, &text2, stx2);
+	uint64_t rdtscp6__ = rdtscp();
+	
+	cpuid();
+	
+	uint64_t rdtscp7__ = rdtscp_intel();
+	cmemcpy(test4, &text2, stx2);
+	uint64_t rdtscp8__ = rdtscp_intel();
+
+	cpuid();
+
+	test1_res =  rdtscp6__ - rdtscp5__;
+	test2_res =  rdtscp8__ - rdtscp7__;
+
+	printf("TEST NUMERO DOS:\n");
+	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
+	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
+
+	// Test numero tres
+	cpuid();
+	
+	uint64_t rdtscp9__ = rdtscp();
+	cmemcpy2(test5, &text3, stx3);
+	uint64_t rdtscp10__ = rdtscp();
+	
+	cpuid();
+	
+	uint64_t rdtscp11__ = rdtscp_intel();
+	cmemcpy(test6, &text3, stx3);
+	uint64_t rdtscp12__ = rdtscp_intel();
+
+	cpuid();
+
+	test1_res =  rdtscp10__ - rdtscp9__;
+	test2_res =  rdtscp12__ - rdtscp11__;
+
+	printf("TEST NUMERO TRES:\n");
+	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
+	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
+
+
 	cpuid();
 
 	free(dest);
