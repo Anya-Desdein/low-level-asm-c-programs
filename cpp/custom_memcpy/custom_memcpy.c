@@ -264,13 +264,15 @@ int main() {
 			cmemcpy(test1, text__, tsize__);
 		}
 		cpuid();
-	
+		asm volatile("":::"memory");
+
 		// Butter
 		rdtsc_v[1] = rdtsc();
 		for(int j=0; j<1000; j++) {
 			cmemcpy2(test2, text__, tsize__);
 		}
 		cpuid();
+		asm volatile("":::"memory");
 		
 		// Libc
 		rdtsc_v[2] = rdtsc();
@@ -278,6 +280,7 @@ int main() {
 			memcpy(test3, text__, tsize__);
 		}
 		cpuid();
+		asm volatile("":::"memory");
 		
 		// Linked other
 		rdtsc_v[3] = rdtsc();
@@ -285,6 +288,7 @@ int main() {
 			lmcp(test4, text__, tsize__);
 		}
 		cpuid();
+		asm volatile("":::"memory");
 		rdtsc_v[4] = rdtsc();	
 
 		rtest[0] =  (rdtsc_v[1] - rdtsc_v[0])/1000;
