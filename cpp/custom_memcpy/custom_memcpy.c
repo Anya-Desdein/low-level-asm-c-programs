@@ -255,40 +255,35 @@ int main() {
 			break;
 
 		}
+	
 		cpuid();
 	
 		// Naive
 		rdtsc_v[0] = rdtsc();
 		cmemcpy(test1, text__, tsize__);
-		rdtsc_v[1] = rdtsc();
-		
 		cpuid();
 	
 		// Butter
-		rdtsc_v[2] = rdtsc();
+		rdtsc_v[1] = rdtsc();
 		cmemcpy2(test2, text__, tsize__);
-		rdtsc_v[3] = rdtsc();
-		
 		cpuid();
-	
-		// Libc
-		rdtsc_v[4] = rdtsc();
-		memcpy(test3, text__, tsize__);
-		rdtsc_v[5] = rdtsc();
 		
+		// Libc
+		rdtsc_v[2] = rdtsc();
+		memcpy(test3, text__, tsize__);
 		cpuid();
 		
 		// Linked other
-		rdtsc_v[6] = rdtsc();
+		rdtsc_v[3] = rdtsc();
 		lmcp(test4, text__, tsize__);
-		rdtsc_v[7] = rdtsc();
+		cpuid();
 		
 		cpuid();
 
 		rtest[0] =  rdtsc_v[1] - rdtsc_v[0];
-		rtest[1] =  rdtsc_v[3] - rdtsc_v[2];
-		rtest[2] =  rdtsc_v[5] - rdtsc_v[4];
-		rtest[3] =  rdtsc_v[7] - rdtsc_v[6];
+		rtest[1] =  rdtsc_v[2] - rdtsc_v[1];
+		rtest[2] =  rdtsc_v[3] - rdtsc_v[2];
+		rtest[3] =  rdtsc_v[4] - rdtsc_v[3];
 
 		printf("TEST NUMERO %s:\n", tname__);
 		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
