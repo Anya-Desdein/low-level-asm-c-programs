@@ -283,10 +283,9 @@ int main() {
 		rdtsc_v[3] = rdtsc();
 		for(int j=0; j<1000; j++) {
 			lmcp(test4, text__, tsize__);
-		}	
+		}
 		cpuid();
-		
-		cpuid();
+		rdtsc_v[4] = rdtsc();	
 
 		rtest[0] =  (rdtsc_v[1] - rdtsc_v[0])/1000;
 		rtest[1] =  (rdtsc_v[2] - rdtsc_v[1])/1000;
