@@ -13,9 +13,9 @@
 #include <inttypes.h>
 
 #include <time.h>
-#include <x86intrin.h> 	// rdtscp and cpuid
+#include <x86intrin.h> 	// rdtsc and cpuid
 #include <cpuid.h> 	// __get_cpuid from gcc extension as an alternative
-#include <immintrin.h>  // __rdtscp from intel intrinsics
+#include <immintrin.h>  // __rdtsc from intel intrinsics
 
 #include <dlfcn.h> 	// dynamic linking library 
 
@@ -44,11 +44,11 @@ static inline void cpuid() {
 	);
 }
 
-// This evolved over time into a function that checks both rdtscp and invariant_tsc
+// This evolved over time into a function that checks both rdtsc and invariant_tsc
 static inline uint32_t* cpuid_gcc() {
 	static uint32_t retvals[3] = {0,0,0};
 
-	uint32_t eax, ebx, ecx, edx, max_leaf, has_rdtscp, has_invariant_tsc;
+	uint32_t eax, ebx, ecx, edx, max_leaf, has_rdtsc, has_invariant_tsc;
 	__get_cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
 	max_leaf = eax;
 	retvals[0] = max_leaf;
@@ -59,9 +59,9 @@ static inline uint32_t* cpuid_gcc() {
 
 	eax = 0, ebx = 0, ecx = 0, edx = 0;
 	__get_cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
- 	has_rdtscp = edx & (1 << 27);
-	retvals[1] = has_rdtscp;
-	printf("Has rdtscp: %" PRIu32 "\n",has_rdtscp);
+ 	has_rdtsc = edx & (1 << 27);
+	retvals[1] = has_rdtsc;
+	printf("Has rdtsc: %" PRIu32 "\n",has_rdtsc);
 	
 	if (max_leaf <= 0x80000007)
 		return retvals;
@@ -75,22 +75,17 @@ static inline uint32_t* cpuid_gcc() {
 	return retvals;
 }
 
-static inline uint64_t rdtscp_intel() {
-		
-	int64_t rdtscp;
-	int32_t aux;
-	rdtscp = __rdtscp(&aux);
-
-	return rdtscp;
+static inline uint64_t rdtsc_intel() {
+	return __rdtsc();
 }
-static inline uint64_t rdtscp() {
+static inline uint64_t rdtsc() {
 		
 	// edx = higher bits
 	// eax = lower bits
 	uint32_t eax, edx;
 
 	asm volatile(
-		"rdtscp"
+		"rdtsc"
 		: "=a" (eax), "=d" (edx) // out
 		:			 // in
 		: "ecx"			 // clobbers
@@ -187,10 +182,10 @@ int main() {
 
 	printf("%s", dest);
 	
-	// Check if rdtscp and cpuid are available
+	// Check if rdtsc and cpuid are available
 	uint32_t *cpuid_ret = cpuid_gcc();
 	if (cpuid_ret[1] == 0) {
-		printf("No rdtscp\n");
+		printf("No rdtsc\n");
 		return 1;
 	}
 
@@ -229,7 +224,7 @@ int main() {
 	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
 	long long int text3 = 6666666666;
 
-	uint64_t rdtscp_v[8];
+	uint64_t rdtsc_v[8];
 	uint64_t rtest[4];
 
 	// Run tests
@@ -263,37 +258,37 @@ int main() {
 		cpuid();
 	
 		// Naive
-		rdtscp_v[0] = rdtscp();
+		rdtsc_v[0] = rdtsc();
 		cmemcpy(test1, text__, tsize__);
-		rdtscp_v[1] = rdtscp();
+		rdtsc_v[1] = rdtsc();
 		
 		cpuid();
 	
 		// Butter
-		rdtscp_v[2] = rdtscp();
+		rdtsc_v[2] = rdtsc();
 		cmemcpy2(test2, text__, tsize__);
-		rdtscp_v[3] = rdtscp();
+		rdtsc_v[3] = rdtsc();
 		
 		cpuid();
 	
 		// Libc
-		rdtscp_v[4] = rdtscp();
+		rdtsc_v[4] = rdtsc();
 		memcpy(test3, text__, tsize__);
-		rdtscp_v[5] = rdtscp();
+		rdtsc_v[5] = rdtsc();
 		
 		cpuid();
 		
 		// Linked other
-		rdtscp_v[6] = rdtscp();
+		rdtsc_v[6] = rdtsc();
 		lmcp(test4, text__, tsize__);
-		rdtscp_v[7] = rdtscp();
+		rdtsc_v[7] = rdtsc();
 		
 		cpuid();
 
-		rtest[0] =  rdtscp_v[1] - rdtscp_v[0];
-		rtest[1] =  rdtscp_v[3] - rdtscp_v[2];
-		rtest[2] =  rdtscp_v[5] - rdtscp_v[4];
-		rtest[3] =  rdtscp_v[7] - rdtscp_v[6];
+		rtest[0] =  rdtsc_v[1] - rdtsc_v[0];
+		rtest[1] =  rdtsc_v[3] - rdtsc_v[2];
+		rtest[2] =  rdtsc_v[5] - rdtsc_v[4];
+		rtest[3] =  rdtsc_v[7] - rdtsc_v[6];
 
 		printf("TEST NUMERO %s:\n", tname__);
 		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
