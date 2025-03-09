@@ -17,6 +17,7 @@
 #include <cpuid.h> 	// __get_cpuid from gcc extension as an alternative
 #include <immintrin.h>  // __rdtscp from intel intrinsics
 
+#include <dlfcn.h> 	// dynamic linking library 
 
 /* 	Calling CPUID to be used as a barrier
 	It has a side effect of serializing instruction stream, 
@@ -156,8 +157,6 @@ int main() {
 
 		In this example only CPU 2 and 1 can run the process
 		
-
-
 	*/	
 	cpu_set_t cpu_set; // this is a mask
 	size_t cpuset_size = sizeof(cpu_set);
@@ -175,7 +174,7 @@ int main() {
 
 	char *dest = malloc(888);
 
-	char copymecd[] = "declare p as pointer to function (pointer to function (double, float) returning pointer to void) returning pointer to const pointer to pointer to function() returning int\n";
+	char copymecd[] = "declare p as pointer to function (pointer to function (double, float) returning pointer to void) returning pointer to const pointer to pointer to function() returning int =\n";
 	size_t size = sizeof(copymecd) - 1;
 
 	char copyme[] = "int(** const *(*p)(void*(*)(double, float)))())\n";
@@ -187,29 +186,12 @@ int main() {
 	cmemcpy(dest2, &copyme, size2);
 
 	printf("%s", dest);
-
-	// Let's measure perf, shall we?
-	char *test1 = malloc(666);
-	char *test2 = malloc(666);
-	char *test3 = malloc(666);
-	char *test4 = malloc(666);
-	char *test5 = malloc(666);
-	char *test6 = malloc(666);
-	char *test7 = malloc(666);
-	char *test8 = malloc(666);
-	char *test9 = malloc(666);
 	
-	char text1[] = "This is the text I want you to copy for me";
-	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
-	
-	// Not even a text
-	long long int text3 = 6666666666;
-	
-	// Test rdtscp and cpuid
+	// Check if rdtscp and cpuid are available
 	uint32_t *cpuid_ret = cpuid_gcc();
 	if (cpuid_ret[1] == 0) {
 		printf("No rdtscp\n");
-		return 0;
+		return 1;
 	}
 
 	if (sched_setaffinity(pid, cpuset_size, &cpu_set) == -1) {
@@ -221,7 +203,7 @@ int main() {
 		perror("sched_setaffinity");
 		return 1;
 	}
-	printf("Making sure that affinity was set properly:\n");
+	printf("Making sure that cpu affinity was set properly:\n");
 	for (int i=0; i<cpuset_size; i++) {
 		if ( (CPU_ISSET(i, &cpu_set)) ) { 
 			printf("1");
@@ -237,102 +219,93 @@ int main() {
 	}
 	printf("\n");
 
-	size_t stx1 = sizeof(text1);
-	size_t stx2 = sizeof(text2);
-	size_t stx3 = sizeof(text3);
+	// COMPARING MEMCOPY IMPLEMENTATIONS
+	void * libmemcpy = dlopen("./mcpc.so", RTLD_NOW);
+	void (* lmcp) (void *, void *, unsigned long long) = dlsym(libmemcpy, "so_memcopy");
+	
+	char *test1 = malloc(666), *test2 = malloc(666), *test3 = malloc(666), *test4 = malloc(666);
 
-	
-	// Test numero uno
-	cpuid();
-	
-	uint64_t rdtscp1__ = rdtscp();
-	cmemcpy2(test1, &text1, stx1);
-	uint64_t rdtscp2__ = rdtscp();
-	
-	cpuid();
-	
-	uint64_t rdtscp3__ = rdtscp_intel();
-	cmemcpy(test2, &text1, stx1);
-	uint64_t rdtscp4__ = rdtscp_intel();
+	char text1[] = "This is the text I want you to copy for me";
+	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
+	long long int text3 = 6666666666;
 
-	cpuid();
+	uint64_t rdtscp_v[8];
+	uint64_t rtest[4];
+
+	// Run tests
+	int ctest__ = 3;
+	char text__[666];
+	size_t tsize__;
+	char tname__[666];
+	for (int i=0; i<ctest__; i++) {
+		
+		switch(i) {
+			
+			case 0:
+			strcpy(text__, text1); 
+			tsize__ = sizeof(text1);
+			strcpy(tname__, "UNO");
+			break;
+			
+			case 1:
+			strcpy(text__, text2); 
+			tsize__ = sizeof(text2);
+			strcpy(tname__, "DOS");
+			break;
+
+			case 2: 
+			memcpy(text__, &text3, sizeof(long long int)); 
+			tsize__ = sizeof(text3);
+			strcpy(tname__, "TRES");
+			break;
+
+		}
+		cpuid();
 	
-	uint64_t rdtscp1 = rdtscp();
-	memcpy(test7, &text1, stx1);
-	uint64_t rdtscp2 = rdtscp();
+		// Naive
+		rdtscp_v[0] = rdtscp();
+		cmemcpy(test1, text__, tsize__);
+		rdtscp_v[1] = rdtscp();
+		
+		cpuid();
 	
-	cpuid();
-
-	uint64_t test1_res =  rdtscp2__ - rdtscp1__;
-	uint64_t test2_res =  rdtscp4__ - rdtscp3__;
-	uint64_t test3_res =  rdtscp2 - rdtscp1;
-
-	printf("TEST NUMERO UNO:\n");
-	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
-	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
-	printf("\tmemcpy (libc): %" PRIu64 "\n", test3_res);
+		// Butter
+		rdtscp_v[2] = rdtscp();
+		cmemcpy2(test2, text__, tsize__);
+		rdtscp_v[3] = rdtscp();
+		
+		cpuid();
 	
-	// Test numero dos
-	cpuid();
-	
-	uint64_t rdtscp5__ = rdtscp();
-	cmemcpy2(test3, &text2, stx2);
-	uint64_t rdtscp6__ = rdtscp();
-	
-	cpuid();
-	
-	uint64_t rdtscp7__ = rdtscp_intel();
-	cmemcpy(test4, &text2, stx2);
-	uint64_t rdtscp8__ = rdtscp_intel();
+		// Libc
+		rdtscp_v[4] = rdtscp();
+		memcpy(test3, text__, tsize__);
+		rdtscp_v[5] = rdtscp();
+		
+		cpuid();
+		
+		// Linked other
+		rdtscp_v[6] = rdtscp();
+		lmcp(test4, text__, tsize__);
+		rdtscp_v[7] = rdtscp();
+		
+		cpuid();
 
-	cpuid();
-	
-	uint64_t rdtscp3 = rdtscp_intel();
-	cmemcpy(test8, &text2, stx2);
-	uint64_t rdtscp4 = rdtscp_intel();
+		rtest[0] =  rdtscp_v[1] - rdtscp_v[0];
+		rtest[1] =  rdtscp_v[3] - rdtscp_v[2];
+		rtest[2] =  rdtscp_v[5] - rdtscp_v[4];
+		rtest[3] =  rdtscp_v[7] - rdtscp_v[6];
 
-	cpuid();
+		printf("TEST NUMERO %s:\n", tname__);
+		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
+		printf("\tcmemcpy2: %" 	       PRIu64 "\n", rtest[1]);
+		printf("\tmemcpy (libc): %"    PRIu64 "\n", rtest[2]);
+		printf("\tmemcopy (linked): %" PRIu64 "\n", rtest[3]);
+	}
 
-	test1_res =  rdtscp6__ - rdtscp5__;
-	test2_res =  rdtscp8__ - rdtscp7__;
-	test3_res =  rdtscp4 - rdtscp3;
-
-	printf("TEST NUMERO DOS:\n");
-	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
-	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
-	printf("\tmemcpy (libc): %" PRIu64 "\n", test3_res);
-
-	// Test numero tres
-	cpuid();
-	
-	uint64_t rdtscp9__ = rdtscp();
-	cmemcpy2(test5, &text3, stx3);
-	uint64_t rdtscp10__ = rdtscp();
-	
-	cpuid();
-	
-	uint64_t rdtscp11__ = rdtscp_intel();
-	cmemcpy(test6, &text3, stx3);
-	uint64_t rdtscp12__ = rdtscp_intel();
-
-	cpuid();
-	
-	uint64_t rdtscp5 = rdtscp_intel();
-	cmemcpy(test9, &text3, stx3);
-	uint64_t rdtscp6 = rdtscp_intel();
-
-	cpuid();
-
-	test1_res =  rdtscp10__ - rdtscp9__;
-	test2_res =  rdtscp12__ - rdtscp11__;
-	test3_res =  rdtscp6 - rdtscp5;
-
-	printf("TEST NUMERO TRES:\n");
-	printf("\tcmemcpy2: %" PRIu64 "\n", test1_res);
-	printf("\tcmemcpy: %" PRIu64 "\n", test2_res);
-	printf("\tmemcpy (libc): %" PRIu64 "\n", test3_res);
-
-	cpuid();
+	free(test1);
+	free(test2);
+	free(test3);
+	free(test4);
 
 	free(dest);
 	return 0;
