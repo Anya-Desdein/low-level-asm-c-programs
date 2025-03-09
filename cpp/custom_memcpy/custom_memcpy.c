@@ -260,30 +260,38 @@ int main() {
 	
 		// Naive
 		rdtsc_v[0] = rdtsc();
-		cmemcpy(test1, text__, tsize__);
+		for(int j=0; j<1000; j++) {
+			cmemcpy(test1, text__, tsize__);
+		}
 		cpuid();
 	
 		// Butter
 		rdtsc_v[1] = rdtsc();
-		cmemcpy2(test2, text__, tsize__);
+		for(int j=0; j<1000; j++) {
+			cmemcpy2(test2, text__, tsize__);
+		}
 		cpuid();
 		
 		// Libc
 		rdtsc_v[2] = rdtsc();
-		memcpy(test3, text__, tsize__);
+		for(int j=0; j<1000; j++) {
+			memcpy(test3, text__, tsize__);
+		}
 		cpuid();
 		
 		// Linked other
 		rdtsc_v[3] = rdtsc();
-		lmcp(test4, text__, tsize__);
+		for(int j=0; j<1000; j++) {
+			lmcp(test4, text__, tsize__);
+		}	
 		cpuid();
 		
 		cpuid();
 
-		rtest[0] =  rdtsc_v[1] - rdtsc_v[0];
-		rtest[1] =  rdtsc_v[2] - rdtsc_v[1];
-		rtest[2] =  rdtsc_v[3] - rdtsc_v[2];
-		rtest[3] =  rdtsc_v[4] - rdtsc_v[3];
+		rtest[0] =  (rdtsc_v[1] - rdtsc_v[0])/1000;
+		rtest[1] =  (rdtsc_v[2] - rdtsc_v[1])/1000;
+		rtest[2] =  (rdtsc_v[3] - rdtsc_v[2])/1000;
+		rtest[3] =  (rdtsc_v[4] - rdtsc_v[3])/1000;
 
 		printf("TEST NUMERO %s:\n", tname__);
 		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
