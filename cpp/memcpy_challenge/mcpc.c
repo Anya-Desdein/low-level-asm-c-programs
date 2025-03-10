@@ -13,8 +13,5 @@ void so_memcopy(
 		src ++;
 
 		count --;
-
 	}
-	
 }
-

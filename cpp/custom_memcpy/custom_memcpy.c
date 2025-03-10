@@ -224,6 +224,20 @@ int main() {
 	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
 	long long int text3 = 6666666666;
 
+	// TODO: Benchmark this one
+	char text4__[] = "as6gn%z#d668";
+	
+	size_t t4s__ = sizeof(text4__);
+	int reps__ = 300;
+	char text4[((t4s__-1) * reps__)];
+	for (int i=0; i < reps__; i++) {
+		memcpy(text4+((t4s__-1)*i), text4__, (t4s__-1));
+	}
+
+	printf("%s\n", text4);
+
+
+
 	uint64_t rdtsc_v[8];
 	uint64_t rtest[4];
 
@@ -257,6 +271,7 @@ int main() {
 		}
 	
 		cpuid();
+		asm volatile("":::"memory");
 	
 		// Naive
 		rdtsc_v[0] = rdtsc();
@@ -296,7 +311,7 @@ int main() {
 		rtest[2] =  (rdtsc_v[3] - rdtsc_v[2])/1000;
 		rtest[3] =  (rdtsc_v[4] - rdtsc_v[3])/1000;
 
-		printf("TEST NUMERO %s:\n", tname__);
+		printf("TEST NUMERO %s:\n",    tname__);
 		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
 		printf("\tcmemcpy2: %" 	       PRIu64 "\n", rtest[1]);
 		printf("\tmemcpy (libc): %"    PRIu64 "\n", rtest[2]);
