@@ -3,7 +3,7 @@
 			// these are not part of standard POSIX API
 
 #include <sched.h>      // Set thread's CPU affinity
-#include <unistd.h> 	// System-related functions like getpid()
+#include <unistd.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,93 +12,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#include <time.h>
-#include <x86intrin.h> 	// rdtsc and cpuid
-#include <cpuid.h> 	// __get_cpuid from gcc extension as an alternative
-#include <immintrin.h>  // __rdtsc from intel intrinsics
-
 #include <dlfcn.h> 	// dynamic linking library 
-
-/* 	Calling CPUID to be used as a barrier
-	It has a side effect of serializing instruction stream, 
-	which means that it ensures that all preceding instructions 
-	are completed before execution.
-
-	It might be slower than fences.
-	Fences:
-		sfence (store fence), 
-		lfence (load fence / waits for all reads),
-		mfence (both load and store) but does NOT cover register operations
-	
-	Rdtscp doesn't flush writeback buffer  	
-*/
-static inline void cpuid() {
-		
-	uint32_t eax=0;
-
-	asm volatile( 
-		"cpuid"
-		: "=a" (eax)	      // output
-		: "a"  (eax)	      // input
-		: "ebx", "ecx", "edx" // clobbered registers
-	);
-}
-
-// This evolved over time into a function that checks both rdtsc and invariant_tsc
-static inline uint32_t* cpuid_gcc() {
-	static uint32_t retvals[3] = {0,0,0};
-
-	uint32_t eax, ebx, ecx, edx, max_leaf, has_rdtsc, has_invariant_tsc;
-	__get_cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
-	max_leaf = eax;
-	retvals[0] = max_leaf;
-	printf("Max leaf: %" PRIu32 "\n",max_leaf);
-	
-	if (max_leaf <= 0x80000001)
-		return retvals;
-
-	eax = 0, ebx = 0, ecx = 0, edx = 0;
-	__get_cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
- 	has_rdtsc = edx & (1 << 27);
-	retvals[1] = has_rdtsc;
-	printf("Has rdtsc: %" PRIu32 "\n",has_rdtsc);
-	
-	if (max_leaf <= 0x80000007)
-		return retvals;
-
-	eax = 0, ebx = 0, ecx = 0, edx = 0;
-	__get_cpuid(0x80000007, &eax, &ebx, &ecx, &edx);
-	has_invariant_tsc = edx & (1 << 8); 
-	retvals[2] = has_invariant_tsc;
-	printf("Has invariant tsc: %" PRIu32 "\n", has_invariant_tsc);
-
-	return retvals;
-}
-
-static inline uint64_t rdtsc_intel() {
-	return __rdtsc();
-}
-static inline uint64_t rdtsc() {
-		
-	// edx = higher bits
-	// eax = lower bits
-	uint32_t eax, edx;
-
-	asm volatile(
-		"rdtsc"
-		: "=a" (eax), "=d" (edx) // out
-		:			 // in
-		: "ecx"			 // clobbers
-	);
-
-	// Cast edx to int64_t, then bitwise shift by 32,
-	// Next OR with eax
-	
-	// 32:32
-	// edx:eax
-	return (int64_t)edx << 32 | eax;
-}
-
 int main() {
 
 	// PURPOSE OF THIS SECTION: Pin this process to only one core in order to measure performance
@@ -127,10 +41,23 @@ int main() {
 
 	pid_t pid = getpid();
 	
-	printf("Size of cpu_set mask: %zu bytes\n", sizeof(cpu_set));
-	printf("Total CPU count: %d, Online: %d\n", all_cpus, online_cpus);
-	printf("Current process ID: %d\n",	    (int)pid);
+	printf("CPU_SET MASK SIZE: %zu BYTES\n",    cpuset_size);
+	printf("TOTAL CPU COUNT: %d, ONLINE: %d\n", all_cpus, online_cpus);
+	printf("CURRENT PROCESS ID: %d\n",	    (int)pid);
 	
+
+	void *pu = dlopen("./perf_utils.so",  RTLD_NOW);
+	if (!pu) {
+		printf("dlopen error: %s\n", dlerror());
+		return 1;
+	}
+
+	uint32_t* (*cpuid_gcc)(void) = dlsym(pu, "cpuid_gcc" );
+	if (!cpuid_gcc) {
+		printf("dlsym error: %s\n", dlerror());
+		return 1;
+	}
+
 	// Check if rdtsc and cpuid are available
 	uint32_t *cpuid_ret = cpuid_gcc();
 	if (cpuid_ret[1] == 0) {
@@ -169,7 +96,7 @@ int main() {
 	char copyme1[] = "declare p as pointer to function (pointer to function (double, float) returning pointer to void) returning pointer to const pointer to pointer to function() returning int =\n";
 	char copyme2[] = "int(** const *(*p)(void*(*)(double, float)))())\n";
 	
-	size_t size = sizeof(copyme1);
+	size_t size  = sizeof(copyme1);
 	size_t size2 = sizeof(copyme2);
 
 	void *f1 = dlopen("./cmemcpy.so",  RTLD_NOW);
@@ -186,10 +113,9 @@ int main() {
 		return 1;
 	}
 
-
 	char *dest = (char *)malloc(2048);
 	
-	cmemcpy (dest,        &copyme1,  size);
+	cmemcpy (dest,          &copyme1,  size);
 	cmemcpy2(dest+size-1,   &copyme2,  size2 );
 
 	printf("%s", dest);
