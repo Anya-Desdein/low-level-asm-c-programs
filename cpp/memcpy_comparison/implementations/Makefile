@@ -4,14 +4,14 @@ SHELL = /bin/sh
 
 CC := gcc
 
-NAME := simple_memcpy
+NAMES := cmemcpy cmemcpy2
 
-FLAGS = -O3 -shared -march=raptorlake -mtune=raptorlake -fomit-frame-pointer 
+FLAGS = -O3 -shared -march=raptorlake -mtune=raptorlake -fomit-frame-pointer -fkeep-inline-functions -mno-avx 
 
-all : $(NAME).so
+all : $(NAMES:%=%.so)
 
-$(NAME).so : $(NAME).c
-	$(CC) $(NAME).c -o $(NAME).so $(FLAGS) 
+%.so : %.c
+	$(CC) $< -o $@ $(FLAGS) 
 
-clean : $(NAME).so
-	rm -f $(NAME).so
+clean :
+	rm -f $(NAMES:%=%.so)

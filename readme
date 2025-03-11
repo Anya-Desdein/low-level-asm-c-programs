@@ -5,7 +5,7 @@ This repository contains various low-level assembly and C programs organized int
 ## Directory Structure
 low_level_asm_c_programs/
 ├── cpp/
-│   ├── custom_memcpy/
+│   ├── memcpy_comparison/
 │   │   └── (custom implementations of memcpy and performance measurement)
 │   ├── elf_loader/
 │   │   └── (ELF loaders & readers)
@@ -15,7 +15,7 @@ low_level_asm_c_programs/
 │   │   └── (preprocessor macros like VA_OPT and VA_ARGS)
 │   └── random/
 │       └── (other miscellaneous programs)
-└── nasm/
+└── asm/
     └── cpuidleaf (CPUID leaf reader)
     └── line reader (command-line line reader)
 

@@ -99,42 +99,6 @@ static inline uint64_t rdtsc() {
 	return (int64_t)edx << 32 | eax;
 }
 
-static void cmemcpy(void* dest, const void* sorc, size_t size) {
-	
-	char * dst = (char *)dest;
-	char * src = (char *)sorc;
-
-	for (size_t i=0; i<size; i++) 
-		*(dst+i) = *(src+i);
-}
-
-static void cmemcpy2(void* const dest, const void* const sorc, const size_t size) {
-
-	const size_t divisor      = sizeof(long long int);
-	const size_t numberofints = size/divisor;
-	      size_t reminder     = size % divisor;
-
-	/* Copy 64 bit chunks */
-	long long int * dst_u64 = (long long int *)dest;
-	long long int * src_u64 = (long long int *)sorc;
-	for (int i = 0; i < numberofints; i++) {
-		*dst_u64 = *src_u64;
-		++dst_u64;
-		++src_u64;
-	}
-
-	/* Copy reminder */
-	char * dst = (char *)dst_u64;
-	char * src = (char *)src_u64;
-	while (reminder) {
-		*dst = *src;
-		++dst;
-		++src;
-
-		--reminder;
-	}
-}
-
 int main() {
 
 	// PURPOSE OF THIS SECTION: Pin this process to only one core in order to measure performance
@@ -166,7 +130,7 @@ int main() {
 	pid_t pid = getpid();
 	printf("Current process ID: %d\n", (int)pid);
 
-	char *dest = malloc(888);
+	char *dest = malloc(1024);
 
 	char copymecd[] = "declare p as pointer to function (pointer to function (double, float) returning pointer to void) returning pointer to const pointer to pointer to function() returning int =\n";
 	size_t size = sizeof(copymecd) - 1;
@@ -217,52 +181,70 @@ int main() {
 	void * libmemcpy = dlopen("./simple_memcpy.so", RTLD_NOW);
 	void (* lmcp) (void *, void *, unsigned long long) = dlsym(libmemcpy, "simple_memcpy");
 	
-	char *test1 = malloc(666), *test2 = malloc(666), *test3 = malloc(666), *test4 = malloc(666);
-
 	char text1[] = "This is the text I want you to copy for me";
 	char text2[] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
 	long long int text3 = 6666666666;
 
-	// TODO: Benchmark this one
-	char text4__[] = "as6gn%z#d668";
+	char pattern1[] = "as6gn%z#d668";
+	size_t pattern1_size = sizeof(pattern1) - 1;
+
+	int reps300 = 300;
+	int reps10000 = 10000;
 	
-	size_t t4s__ = sizeof(text4__);
-	int reps__ = 300;
-	char text4[((t4s__-1) * reps__)];
-	for (int i=0; i < reps__; i++) {
-		memcpy(text4+((t4s__-1)*i), text4__, (t4s__-1));
-	}
+	char *text4 = (char *)malloc(pattern1_size * reps300 + 1);
+	char *text5 = (char *)malloc(pattern1_size * reps10000 + 1);
+
+	for (int i=0; i < reps300; i++) {
+		memcpy( text4 + (pattern1_size * i), pattern1, pattern1_size);
+	} text4[pattern1_size * reps300] = '\0';
+	
+
+	for (int i=0; i < reps10000; i++) {
+		memcpy( text5 + (pattern1_size * i), pattern1, pattern1_size);
+	} text5[pattern1_size * reps10000] = '\0';
 
 	uint64_t rdtsc_v[8];
 	uint64_t rtest[4];
 
 	// Run tests
-	int ctest__ = 3;
-	char text__[666];
+	char * test_dest = (char *)malloc(32768);
+	char * text;
+	int ctest__ = 5;
 	size_t tsize__;
-	char tname__[666];
+	char tname__[128];
 	for (int i=0; i<ctest__; i++) {
 		
 		switch(i) {
 			
 			case 0:
-			strcpy(text__, text1); 
+			text = text1;
 			tsize__ = sizeof(text1);
 			strcpy(tname__, "UNO");
 			break;
 			
 			case 1:
-			strcpy(text__, text2); 
+			text = text2;
 			tsize__ = sizeof(text2);
 			strcpy(tname__, "DOS");
 			break;
 
 			case 2: 
-			memcpy(text__, &text3, sizeof(long long int)); 
+			text = (char *)&text3;
 			tsize__ = sizeof(text3);
 			strcpy(tname__, "TRES");
 			break;
-
+		
+			case 3: 
+			text = text4;
+			tsize__ = sizeof(text4);
+			strcpy(tname__, "CUATRO");
+			break;
+	
+			case 4: 
+			text = text5;
+			tsize__ = sizeof(text5);
+			strcpy(tname__, "CINCO");
+			break;
 		}
 	
 		cpuid();
@@ -271,7 +253,7 @@ int main() {
 		// Naive
 		rdtsc_v[0] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			cmemcpy(test1, text__, tsize__);
+			cmemcpy(test_dest, text, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -279,7 +261,7 @@ int main() {
 		// Butter
 		rdtsc_v[1] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			cmemcpy2(test2, text__, tsize__);
+			cmemcpy2(test_dest, text, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -287,7 +269,7 @@ int main() {
 		// Libc
 		rdtsc_v[2] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			memcpy(test3, text__, tsize__);
+			memcpy(test_dest, text, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -295,7 +277,7 @@ int main() {
 		// Linked other
 		rdtsc_v[3] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			lmcp(test4, text__, tsize__);
+			lmcp(test_dest, text, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -313,10 +295,11 @@ int main() {
 		printf("\tmemcopy (linked): %" PRIu64 "\n", rtest[3]);
 	}
 
-	free(test1);
-	free(test2);
-	free(test3);
-	free(test4);
+	
+	free(test_dest);
+	
+	free(text4);
+	free(text5);
 
 	free(dest);
 	return 0;

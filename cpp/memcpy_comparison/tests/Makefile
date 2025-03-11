@@ -1,12 +1,15 @@
 SHELL = /bin/sh
 
-.PHONY: run clean symlink
+.PHONY: run runt clean cleant link
 
 CC := gcc
 
-FLAGS = -O1 -fno-strict-aliasing -fno-tree-dce -march=native
+FLAGS = -O1 -g3 -ggdb -fno-strict-aliasing -fno-tree-dce -march=native
 
-SRC = custom_memcpy
+SRC = tests
+TST = self_tests
+
+LIBDIR = ./../implementations/
 
 all: run
 
@@ -17,7 +20,19 @@ run: $(SRC)
 	./$(SRC)
 
 clean:
-	rm -f custom_memcpy
+	rm -f tests
 
-symlink:
-	ln -sf ./../implementations/simple_memcpy.so ./simple_memcpy.so
+runt: $(TST) link
+	./$(TST)
+	
+
+$(TST): $(TST).c
+	$(CC) $(TST).c -o $(TST) $(FLAGS)
+
+link:
+	ls -l $(LIBDIR)*.so
+	@find $(LIBDIR) -name "*.so" -exec ln -sf {} ./ \;
+
+cleant:
+	rm -f *.so
+	rm -f self_tests
