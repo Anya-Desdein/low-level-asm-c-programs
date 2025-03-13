@@ -14,6 +14,16 @@
 
 #include <dlfcn.h> 	// dynamic linking library 
 
+char *mallocnfill(char *pattern, size_t psize, int reps) {	
+	char *text__ = (char *)malloc(psize * reps + 1);
+	for (int i=0; i < reps; i++) {
+		memcpy(text__ + (psize * i), pattern, psize);
+	} 
+	text__[psize * reps] = '\0';
+
+	return text__;
+}
+
 int main() {
 	cpu_set_t cpu_set; 
 	size_t cpuset_size = sizeof(cpu_set);
@@ -99,55 +109,34 @@ int main() {
 	size_t pattern1_size = sizeof(pattern1) - 1;
 	size_t pattern2_size = sizeof(pattern1) - 1;
 
-	int reps300 = 300;
-	int reps1100 = 1100;
-	int reps6000 = 6000;
-	int reps10000 = 10000;
-	
-	char *text4 = (char *)malloc(pattern1_size * reps300 + 1);
-	char *text5 = (char *)malloc(pattern1_size * reps1100 + 1);
-	char *text6 = (char *)malloc(pattern1_size * reps6000 + 1);
-	char *text7 = (char *)malloc(pattern1_size * reps10000 + 1);
-	
-	char *text4a = (char *)malloc(pattern2_size * reps300 + 1);
-	char *text5a = (char *)malloc(pattern2_size * reps1100 + 1);
-	char *text6a = (char *)malloc(pattern2_size * reps6000 + 1);
-	char *text7a = (char *)malloc(pattern2_size * reps10000 + 1);
+	int reps;
+	int ptests = 8;	
+	char *text[ptests];
+	char * pattern 	    = pattern1     ;
+	size_t pattern_size = pattern1_size;
+	for (int i=1; i <= ptests; i++) {
+		if (i % 1) 
+			reps = 300;
+		if (i % 2)
+			reps = 1100;
+		if (i % 3)
+			reps = 6000;
+		if (i % 4)
+			reps = 1000;
+		if (i > 4) { 
+			pattern = pattern2;
+			pattern_size = pattern2_size;
+		}
 
-	for (int i=0; i < reps300; i++) {
-		memcpy( text4 +  (pattern1_size * i), pattern1, pattern1_size);
-		memcpy( text4a + (pattern2_size * i), pattern2, pattern2_size);
-	} 
-	text4[ pattern1_size * reps300] = '\0';
-	text4a[pattern2_size * reps300] = '\0';
-
-	for (int i=0; i < reps1100; i++) {
-		memcpy( text5 +  (pattern1_size * i), pattern1, pattern1_size);
-		memcpy( text5a + (pattern2_size * i), pattern2, pattern2_size);
-	} 
-	text5[ pattern1_size * reps1100] = '\0';
-	text5a[pattern2_size * reps1100] = '\0';
-	
-	for (int i=0; i < reps6000; i++) {
-		memcpy( text6 +  (pattern1_size * i), pattern1, pattern1_size);
-		memcpy( text6a + (pattern2_size * i), pattern2, pattern2_size);
-	} 
-	text6[ pattern1_size * reps6000] = '\0';
-	text6a[pattern2_size * reps6000] = '\0';
-
-	for (int i=0; i < reps10000; i++) {
-		memcpy( text7 +  (pattern1_size * i), pattern1, pattern1_size);
-		memcpy( text7a + (pattern2_size * i), pattern2, pattern2_size);
-	} 
-	text7[ pattern1_size * reps10000] = '\0';
-	text7a[pattern2_size * reps10000] = '\0';
+		text[i-1] = mallocnfill(pattern, pattern_size, reps);	
+	}
 
 	// INIT
 	uint64_t rdtsc_v[8];
 	uint64_t rtest[4];
 
 	char * test_dest = (char *)malloc(131072);
-	char * text;
+	char * itext;
 
 	int ctest__ = 11;
 	size_t tsize__;
@@ -157,68 +146,68 @@ int main() {
 		switch(i) {
 			
 			case 0:
-			text = text1;
+			itext = text1;
 			tsize__ = sizeof(text1);
 			strcpy(tname__, "NUMERO UNO, COPY STRING");
 			break;
 			
 			case 1:
-			text = text2;
+			itext = text2;
 			tsize__ = sizeof(text2);
 			strcpy(tname__, "NUMERO DOS, COPY LONGER STRING");
 			break;
 
 			case 2: 
-			text = (char *)&text3;
+			itext = (char *)&text3;
 			tsize__ = sizeof(long long int);
 			strcpy(tname__, "NUMERO TRES, COPY LONG LONG INT");
 			break;
 		
 			case 3: 
-			text = text4;
-			tsize__ = strlen(text4) + 1;
+			itext = text[0];
+			tsize__ = strlen(text[0]) + 1;
 			strcpy(tname__, "NUMERO CUATRO, COPY PATTERN1");
 			break;
 	
 			case 4: 
-			text = text4a;
-			tsize__ = strlen(text4a) + 1;
+			itext = text[1];
+			tsize__ = strlen(text[1]) + 1;
 			strcpy(tname__, "NUMERO CINCO, COPY PATTERN2");
 			break;
 
 			case 5: 
-			text = text5;
-			tsize__ = strlen(text5) + 1;
+			itext = text[2];
+			tsize__ = strlen(text[2]) + 1;
 			strcpy(tname__, "NUMERO SEIS, COPY PATTERN1");
 			break;
 			
 			case 6: 
-			text = text5a;
-			tsize__ = strlen(text5a) + 1;
+			itext = text[3];
+			tsize__ = strlen(text[3]) + 1;
 			strcpy(tname__, "NUMERO SIETE, COPY PATTERN2");
 			break;
 			
 			case 7: 
-			text = text6;
-			tsize__ = strlen(text6) + 1;
+			itext = text[4];
+			tsize__ = strlen(text[4]) + 1;
 			strcpy(tname__, "NUMERO OCHO, COPY PATTERN1");
 			break;
 			
 			case 8: 
-			text = text6a;
-			tsize__ = strlen(text6a) + 1;
+			itext = text[5];
+			tsize__ = strlen(text[5]) + 1;
 			strcpy(tname__, "NUMERO NUEVE, COPY PATTERN2");
 			break;
 
 			case 9: 
-			text = text7;
-			tsize__ = strlen(text7) + 1;
+			itext = text[6];
+			tsize__ = strlen(text[6]) + 1;
 			strcpy(tname__, "NUMERO DIEZ, COPY PATTERN1");
 			break;
 
 			case 10: 
-			text = text7a;
-			tsize__ = strlen(text7a) + 1;
+			itext = text[7];
+			tsize__ = strlen(text[7]) + 1;
 			strcpy(tname__, "NUMERO ONCE, COPY PATTERN2");
 			break;
 
@@ -229,12 +218,12 @@ int main() {
 	
 		// Naive
 		for(int j=0; j<666; j++) {
-			cmemcpy(test_dest, text, tsize__);
+			cmemcpy(test_dest, itext, tsize__);
 		}
 		
 		rdtsc_v[0] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			cmemcpy(test_dest, text, tsize__);
+			cmemcpy(test_dest, itext, tsize__);
 		}
 		
 		cpuid();
@@ -243,12 +232,12 @@ int main() {
 		
 		// Butter
 		for(int j=0; j<666; j++) {
-			cmemcpy2(test_dest, text, tsize__);
+			cmemcpy2(test_dest, itext, tsize__);
 		}
 
 		rdtsc_v[2] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			cmemcpy2(test_dest, text, tsize__);
+			cmemcpy2(test_dest, itext, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -256,12 +245,12 @@ int main() {
 		
 		// Libc
 		for(int j=0; j<666; j++) {
-			memcpy(test_dest, text, tsize__);
+			memcpy(test_dest, itext, tsize__);
 		}
 
 		rdtsc_v[4] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			memcpy(test_dest, text, tsize__);
+			memcpy(test_dest, itext, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -270,12 +259,12 @@ int main() {
 
 		// TODO: Replace
 		for(int j=0; j<666; j++) {
-			cmemcpy2(test_dest, text, tsize__);
+			cmemcpy2(test_dest, itext, tsize__);
 		}
 
 		rdtsc_v[6] = rdtsc();
 		for(int j=0; j<1000; j++) {
-			cmemcpy2(test_dest, text, tsize__);
+			cmemcpy2(test_dest, itext, tsize__);
 		}
 		cpuid();
 		asm volatile("":::"memory");
@@ -287,7 +276,7 @@ int main() {
 		rtest[3] =  (rdtsc_v[7] - rdtsc_v[6])/1000;
 
 		printf("%s:\n",		         tname__);
-		printf("Of lenght: %zu bytes\n", tsize__);
+		printf("LENGHT: %zu bytes\n", tsize__);
 		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
 		printf("\tcmemcpy2: %" 	       PRIu64 "\n", rtest[1]);
 		printf("\tmemcpy (libc): %"    PRIu64 "\n", rtest[2]);
@@ -296,8 +285,8 @@ int main() {
 
 	
 	free(test_dest);
-	
-	free(text4);
-	free(text5);
+	for (int i=0; i < ptests; i++) {
+		free(text[i]);
+	}
 	return 0;
 }
