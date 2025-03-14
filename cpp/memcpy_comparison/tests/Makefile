@@ -1,10 +1,10 @@
 SHELL = /bin/sh
 
-.PHONY: run runt runa clean cleant cleana link
+.PHONY: build clean run link runt cleant
 
 CC := gcc
 
-FLAGS = -O1 -g3 -ggdb -fno-strict-aliasing -fno-tree-dce -march=native
+FLAGS = -O0 -g3 -ggdb -fno-strict-aliasing -fno-tree-dce -march=native -fsanitize=address -fsanitize=undefined
 SRD_FLAGS = -shared -fPIC
 
 SRC = tests
@@ -13,12 +13,11 @@ SRD = perf_utils
 
 LIBDIR = ./../implementations/
 
-all: runa
+all: build
 
-runa: $(TST) link $(SRC)
-	./$(SRC)
-
-run: $(SRC)
+build: $(TST) link $(SRC)
+	
+run: $(SRC) link
 	./$(SRC)
 
 runt: $(TST) link
@@ -37,14 +36,10 @@ link:
 	ls -l $(LIBDIR)*.so
 	@find $(LIBDIR) -name "*.so" -exec ln -sf {} ./ \;
 
-cleana:
+clean:
 	rm -f tests
 	rm -f *.so
 	rm -f self_tests
 
-clean:
-	rm -f tests
-
 cleant:
-	rm -f *.so
 	rm -f self_tests
