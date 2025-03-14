@@ -1,17 +1,20 @@
-void cmemcpy(
-	      void* restrict dest_,
-	const void* restrict src_,
-	unsigned long long count
-) {
+#include <stddef.h>
+
+void *cmemcpy(
+	      void *restrict const dest_,
+	const void *restrict const src_,
+	size_t                     size) {
 
 	char *dest = (char *)dest_;
 	char *src  = (char *)src_;
 	
-	while(count) {
+	while(size) {
 		*dest = *src;
 		dest++;
 		src ++;
 
-		count --;
+		size --;
 	}
+
+	return dest_;
 }

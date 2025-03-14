@@ -1,14 +1,17 @@
 #include <stddef.h>
 
-void cmemcpy2(void* const dest, const void* const sorc, const size_t size) {
+void *cmemcpy2(
+	      void *restrict const dest_, 
+	const void *restrict const src_,
+	size_t                     size) {
 
 	const size_t divisor      = sizeof(long long int);
 	const size_t numberofints = size/divisor;
 	      size_t reminder     = size % divisor;
 
 	/* Copy 64 bit chunks */
-	long long int * dst_u64 = (long long int *)dest;
-	long long int * src_u64 = (long long int *)sorc;
+	long long int * dst_u64 = (long long int *)dest_;
+	long long int * src_u64 = (long long int *)src_;
 	for (int i = 0; i < numberofints; i++) {
 		*dst_u64 = *src_u64;
 		++dst_u64;
@@ -25,4 +28,6 @@ void cmemcpy2(void* const dest, const void* const sorc, const size_t size) {
 
 		--reminder;
 	}
+
+	return dest_;
 }
