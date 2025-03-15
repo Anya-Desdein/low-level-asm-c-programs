@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -16,6 +17,9 @@
 
 #include "perf_utils.h"
 #include "memcpy.h"
+
+#define TEXT_MAX_SIZE (1 << 9)
+#define MALLOC_SIZE   (1 << 13)
 
 int main() {
 
@@ -98,12 +102,28 @@ int main() {
 			printf("\n");
 	} printf("\n");
 
-	// Test linkage
-	char copyme1[] = "declare p as pointer to function (pointer to function (double, float) returning pointer to void) returning pointer to const pointer to pointer to function() returning int =\n";
-	char copyme2[] = "int(** const *(*p)(void*(*)(double, float)))())\n";
+	typedef struct {
+		char   text[TEXT_MAX_SIZE];
+		size_t size;
+	} Testdata;
+
+	union {
+		Testdata longtxt;
+		Testdata shorttxt;
+	} Tests;
+
+	strcpy(
+		Tests.longtxt.text,
+		"declare p as pointer to function (pointer to function (double, float) "
+		"returning pointer to void) returning pointer to const pointer to pointer "
+		"to function() returning int =\n"
+	);
+	strcpy(
+		Tests.shorttxt.text, 
+		"int(** const *(*p)(void*(*)(double, float)))())\n");
 	
-	size_t size  = sizeof(copyme1);
-	size_t size2 = sizeof(copyme2);
+	Tests.longtxt.size  = strlen(Tests.longtxt.text );
+	Tests.shorttxt.size = strlen(Tests.shorttxt.text);
 
 	void *f1 = dlopen("./cmemcpy.so",  RTLD_NOW);
 	void *f2 = dlopen("./cmemcpy2.so", RTLD_NOW);
@@ -119,10 +139,10 @@ int main() {
 		return 1;
 	}
 
-	char *dest = (char *)malloc(2048);
+	char *dest = (char *)malloc(MALLOC_SIZE);
 	
-	cmemcpy (dest,          &copyme1,  size );
-	cmemcpy2(dest+size-1,   &copyme2,  size2);
+	cmemcpy (dest,                    &Tests.longtxt.text ,  Tests.longtxt.size ); 
+	cmemcpy2(dest+Tests.longtxt.size, &Tests.shorttxt.text,  Tests.shorttxt.size);
 
 	printf("%s", dest);
 	free(dest);
