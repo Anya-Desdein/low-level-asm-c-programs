@@ -5,6 +5,9 @@
 
 #include <x86intrin.h> 	// rdtsc and cpuid
 #include <cpuid.h> 	// __get_cpuid from gcc extension as an alternative
+
+#include "perf_utils.h"
+
 /*
 
 IMPORTANT! Changed __get_cpuid to __cpuid
@@ -31,7 +34,7 @@ and
 	
 	Rdtscp doesn't flush writeback buffer  	
 */
-void cpuid() {
+void cpuid(void) {
 		
 	uint32_t eax=0;
 
@@ -43,43 +46,45 @@ void cpuid() {
 	);
 }
 
-
 // This evolved over time into a function that checks both rdtsc and invariant_tsc
-uint32_t * cpuid_gcc() {
-	static uint32_t retvals[3] = {0,0,0};
+Cpustat cpuid_gcc(void) {
+
+	Cpustat retvals = {0,0,0};
 	
-	uint32_t eax=0, ebx=0, ecx=0, edx=0, max_leaf, has_rdtsc, has_invariant_tsc;
+	uint32_t eax=0, ebx=0, ecx=0, edx=0;
 	__cpuid(0x80000000, eax, ebx, ecx, edx);
-	max_leaf = eax;
-	retvals[0] = max_leaf;
-	printf("Max leaf: %" PRIu32 "\n",max_leaf);
 	
-	if (max_leaf <= 0x80000001)
+	retvals.max_leaf = eax;
+
+	printf("Max leaf: %" PRIu32 "\n", retvals.max_leaf);
+	if (retvals.max_leaf <= 0x80000001)
 		return retvals;
 
 	eax = 0, ebx = 0, ecx = 0, edx = 0;
 	__cpuid(0x80000001, eax, ebx, ecx, edx);
- 	has_rdtsc = edx & (1 << 27);
-	retvals[1] = has_rdtsc;
-	printf("Has rdtsc: %" PRIu32 "\n",has_rdtsc);
+ 	
+	retvals.has_rdtsc = edx & (1 << 27);
 	
-	if (max_leaf <= 0x80000007)
+	printf("Has rdtsc: %" PRIu32 "\n", retvals.has_rdtsc);
+	
+	if (retvals.max_leaf <= 0x80000007)
 		return retvals;
 
 	eax = 0, ebx = 0, ecx = 0, edx = 0;
 	__cpuid(0x80000007, eax, ebx, ecx, edx);
-	has_invariant_tsc = edx & (1 << 8); 
-	retvals[2] = has_invariant_tsc;
-	printf("Has invariant tsc: %" PRIu32 "\n", has_invariant_tsc);
+
+	retvals.has_invariant_tsc = edx & (1 << 8); 
+	
+	printf("Has invariant tsc: %" PRIu32 "\n", retvals.has_invariant_tsc);
 
 	return retvals;
 }
 
-uint64_t rdtsc_intel() {
+uint64_t rdtsc_intel(void) {
 	return __rdtsc();
 }
 
-uint64_t rdtsc() {
+uint64_t rdtsc(void) {
 		
 	// edx = higher bits
 	// eax = lower bits

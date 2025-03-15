@@ -14,6 +14,9 @@
 
 #include <dlfcn.h> 	// dynamic linking library 
 
+#include "perf_utils.h"
+#include "memcpy.h"
+
 char *mallocnfill(char *pattern, size_t psize, int reps) {	
 	char *text__ = (char *)malloc(psize * reps + 1);
 	for (int i=0; i < reps; i++) {
@@ -46,38 +49,38 @@ int main() {
 		return 1;
 	}
 	
-	void (*cpuid)(void) = dlsym(pu, "cpuid");
+	cpuid_t cpuid = dlsym(pu, "cpuid");
 	if (!cpuid) {
 		printf("dlopen error: %s\n", dlerror());
 		return 1;
 	}
 
-	uint32_t* (*cpuid_gcc)(void) = dlsym(pu, "cpuid_gcc");
+	cpuid_gcc_t cpuid_gcc = dlsym(pu, "cpuid_gcc");
 	if (!cpuid_gcc) {
 		printf("dlopen error: %s\n", dlerror());
 		return 1;
 	}
 
-	uint64_t (*rdtsc)(void) = dlsym(pu, "rdtsc");
+	rdtsc_t rdtsc = dlsym(pu, "rdtsc");
 	if (!rdtsc) {
 		printf("dlopen error: %s\n", dlerror());
 		return 1;
 	}
 
-	uint64_t (*rdtsc_intel)(void) = dlsym(pu, "rdtsc_intel");
+	rdtsc_intel_t rdtsc_intel = dlsym(pu, "rdtsc_intel");
 	if (!rdtsc_intel) {
 		printf("dlopen error: %s\n", dlerror());
 		return 1;
 	}
 
 	// Check if rdtsc and cpuid are available
-	uint32_t *cpuid_ret = cpuid_gcc();
-	if (cpuid_ret[1] == 0) {
+	Cpustat cpuid_ret = cpuid_gcc();
+	if (cpuid_ret.has_rdtsc == 0) {
 		printf("No rdtsc\n");
 		return 1;
 	}
 
-	if (cpuid_ret[2] == 0) {
+	if (cpuid_ret.has_invariant_tsc == 0) {
 		printf("No invariant TSC, unused for now\n");
 	}
 
@@ -95,8 +98,8 @@ int main() {
 	void * f1 = dlopen("./cmemcpy.so",  RTLD_NOW);
 	void * f2 = dlopen("./cmemcpy2.so", RTLD_NOW);
 
-	void (* cmemcpy)  (void *, void *, unsigned long long) = dlsym(f1, "cmemcpy" );
-	void (* cmemcpy2) (void *, void *, unsigned long long) = dlsym(f2, "cmemcpy2");
+	memcpy_t cmemcpy  = dlsym(f1, "cmemcpy" );
+	memcpy_t cmemcpy2 = dlsym(f2, "cmemcpy2");
 
 	// TEST STRINGS
 	int ptests = 8;	

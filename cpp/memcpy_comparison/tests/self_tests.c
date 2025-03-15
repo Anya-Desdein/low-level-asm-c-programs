@@ -13,6 +13,10 @@
 #include <inttypes.h>
 
 #include <dlfcn.h> 	// dynamic linking library 
+
+#include "perf_utils.h"
+#include "memcpy.h"
+
 int main() {
 
 	// PURPOSE OF THIS SECTION: Pin this process to only one core in order to measure performance
@@ -51,21 +55,23 @@ int main() {
 		printf("dlopen error: %s\n", dlerror());
 		return 1;
 	}
+	
+	Cpustat cpustat;
+	cpuid_gcc_t cpuid_gcc = (cpuid_gcc_t) dlsym(pu, "cpuid_gcc");
 
-	uint32_t* (*cpuid_gcc)(void) = dlsym(pu, "cpuid_gcc" );
 	if (!cpuid_gcc) {
 		printf("dlsym error: %s\n", dlerror());
 		return 1;
 	}
 
 	// Check if rdtsc and cpuid are available
-	uint32_t *cpuid_ret = cpuid_gcc();
-	if (cpuid_ret[1] == 0) {
+	cpustat = cpuid_gcc();
+	if (cpustat.has_rdtsc == 0) {
 		printf("No rdtsc\n");
 		return 1;
 	}
 
-	if (cpuid_ret[2] == 0) {
+	if (cpustat.has_invariant_tsc == 0) {
 		printf("No invariant TSC, unused for now\n");
 	} 
 
@@ -78,7 +84,7 @@ int main() {
 		perror("sched_setaffinity");
 		return 1;
 	} printf("Making sure that cpu affinity was set properly:\n");
-	for (int i=0; i<cpuset_size; i++) {
+	for (size_t i=0; i<cpuset_size; i++) {
 		if ( (CPU_ISSET(i, &cpu_set)) ) { 
 			printf("1");
 		} else { 
@@ -106,8 +112,8 @@ int main() {
 		return 1;
 	}
 
-	void (* cmemcpy)  (void *, void *, unsigned long long) = dlsym(f1, "cmemcpy" );
-	void (* cmemcpy2) (void *, void *, unsigned long long) = dlsym(f2, "cmemcpy2");
+	memcpy_t cmemcpy  = dlsym(f1, "cmemcpy" );
+	memcpy_t cmemcpy2 = dlsym(f2, "cmemcpy2");
 	if (!cmemcpy || !cmemcpy2) {
 		perror("dlsym");
 		return 1;
@@ -115,8 +121,8 @@ int main() {
 
 	char *dest = (char *)malloc(2048);
 	
-	cmemcpy (dest,          &copyme1,  size);
-	cmemcpy2(dest+size-1,   &copyme2,  size2 );
+	cmemcpy (dest,          &copyme1,  size );
+	cmemcpy2(dest+size-1,   &copyme2,  size2);
 
 	printf("%s", dest);
 	free(dest);
