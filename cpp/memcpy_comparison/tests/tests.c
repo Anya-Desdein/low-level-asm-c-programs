@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -17,17 +18,283 @@
 #include "perf_utils.h"
 #include "memcpy.h"
 
-char *mallocnfill(char *pattern, size_t psize, int reps) {	
-	char *text__ = (char *)malloc(psize * reps + 1);
-	for (int i=0; i < reps; i++) {
-		memcpy(text__ + (psize * i), pattern, psize);
-	} 
-	text__[psize * reps] = '\0';
+#define TEXT_MAX_SIZE  (1 << 19)
+#define TITLE_MAX_SIZE (1 << 9 )
 
-	return text__;
+#define SINGLE_TEST_COUNT	3
+
+#define PATTERN_COUNT		2
+#define PATTERN_REPEAT_COUNT	4
+
+#define MEMCPY_COUNT		3
+#define WARMUP_COUNT		666
+#define RUN_COUNT		1024	 
+
+#define UNIQUE_TEST_COUNT	((SINGLE_TEST_COUNT) + (PATTERN_COUNT))
+#define TEST_COUNT		((SINGLE_TEST_COUNT) + ((PATTERN_COUNT) * (PATTERN_REPEAT_COUNT)))
+#define FULL_TEST_COUNT		(TEST_COUNT * MEMCPY_COUNT)
+
+// positive value ? -1 : 0
+// -1 is invalid size
+#define BUILD_BUG_ON_ZERO(expr) ((int)(sizeof(struct { int:(-!!(expr)); })))
+
+// sametype ? 1 : 0;
+#define __same_type(a,b) __builtin_types_compatible_p(typeof(a), typeof(b))
+
+#define ARRAY_SIZE(arr) \
+	(BUILD_BUG_ON_ZERO( \
+		__same_type((arr), &(arr)[0])), \
+		(sizeof(arr) / sizeof((arr)[0])) \
+	)
+
+// Converts argument into string
+#define STRINGIFY__(x) #x
+#define STRINGIFY(x)  STRINGIFY__(x)
+
+struct {
+	rdtsc_t 	rdtsc;
+	rdtsc_intel_t	rdtsc_intel;
+	cpuid_t		cpuid;
+	cpuid_gcc_t     cpuid_gcc;
+} utils;
+
+typedef struct {
+	memcpy_t func; 
+	char	 name[TITLE_MAX_SIZE];
+} Memcpy;
+
+struct {
+	Memcpy arr[MEMCPY_COUNT];
+} tested_memcpy;
+
+typedef struct {
+	char 	 name[TITLE_MAX_SIZE];
+	char 	 text[TEXT_MAX_SIZE];
+	size_t 	 reps;
+	size_t 	 size;
+} Entry;
+
+typedef struct {
+	Entry arr[TEST_COUNT];
+} Entries;
+Entries entries;
+
+typedef struct {
+	char 	test_name  [TITLE_MAX_SIZE];
+	char 	memcpy_name[TITLE_MAX_SIZE];
+	size_t 	size;
+	size_t 	difftime;
+} Result;
+
+struct {
+	Result	arr[FULL_TEST_COUNT];
+} results;
+
+size_t generate_pattern_reps (	
+	Entry *restrict const pattern_el 
+) {
+
+	static char   *prev_pattern_name;
+	
+	static size_t  reps	 = 0;
+	static size_t  size	 = 0;
+	       size_t  base_reps = pow(2,8);
+	       size_t  increment = pow(2,2);
+
+	if (!pattern_el->text || !pattern_el->name || !pattern_el->size) {
+		printf("Entry pattern_txt incorrectly passed to generate_pattern_reps function\n");
+		exit(1);
+	}
+	char *pattern_name = pattern_el->name;
+
+	if (prev_pattern_name && strcmp(prev_pattern_name, pattern_name) == 0) {
+
+		if ((reps * increment * size) > TEXT_MAX_SIZE) {
+			reps = TEXT_MAX_SIZE;
+		} else {
+			reps = reps * increment;
+		}
+
+	} else {
+		
+		size = pattern_el->size;
+		reps = base_reps;
+		prev_pattern_name = pattern_name;
+	}
+
+	return reps;
 }
 
-int main() {
+void fill(
+	char *restrict const buffer, 
+	char *restrict const pattern,
+	size_t 		     bufsize
+) {
+	
+	const size_t divisor        = strlen(pattern);
+	const size_t numberofcopies = (bufsize) / divisor;
+	      size_t reminder	    = (bufsize) % divisor;
+	      char  *dst_chunk      = buffer; 
+
+	for (size_t i=0; i < numberofcopies; i++) { 
+		memcpy(dst_chunk, pattern, divisor);
+		
+		dst_chunk += divisor;
+	}
+
+	for (size_t i=0; i < reminder; i++) {
+		memcpy(dst_chunk, pattern+i, 1);
+	
+		dst_chunk ++;
+		reminder --;
+	} buffer[bufsize] = '\0';
+}
+
+size_t measure_time( 
+	char  	*dst_txt,
+	char	*src_txt,
+	size_t 	 size,
+
+	size_t 	 warmup_count,
+	size_t 	 run_count,
+	memcpy_t tested_memcpyi
+
+) {
+		size_t starttime, endtime, difftime;
+
+		utils.cpuid();
+		asm volatile("":::"memory");
+		
+		for(size_t i=0; i < warmup_count; i++) {
+			tested_memcpyi(
+				dst_txt,	
+				src_txt,
+				size);
+		}
+		
+		starttime = utils.rdtsc();
+
+		for(size_t i=0; i < warmup_count; i++) {
+			tested_memcpyi(
+				dst_txt,	
+				src_txt,
+				size);
+		}
+		
+		utils.cpuid();
+		asm volatile("":::"memory");
+		
+		endtime = utils.rdtsc();
+
+		difftime = (endtime - starttime)/run_count;
+		return difftime;
+}
+
+void test_memcpy_set(){
+	
+	size_t  marr = ARRAY_SIZE(tested_memcpy.arr),
+		tarr = ARRAY_SIZE(entries.arr),
+		rarr = ARRAY_SIZE(results.arr);
+
+	if (marr != MEMCPY_COUNT) { 
+		printf("tested_memcpy.arr not %d elements long\n", MEMCPY_COUNT);
+		exit(1);
+	}
+
+	if (tarr != TEST_COUNT) {
+		printf("entries.arr not %d elements long\n",       TEST_COUNT);
+		exit(1);
+	}
+
+	if (rarr != FULL_TEST_COUNT) {
+		printf("results.arr not %d elements long\n",       FULL_TEST_COUNT);
+		exit(1);
+	}
+
+	printf("marr: %zu tarr: %zu, rarr: %zu\n", marr, tarr, rarr);
+
+	int   idx 	 = 0;
+	char *src_txt    = (char *)malloc(TEXT_MAX_SIZE);
+	char *dst_txt 	 = (char *)malloc(TEXT_MAX_SIZE);
+
+	for (unsigned int i=0; i < marr; i++) {
+		for (unsigned int j=0; j < tarr; j++) {
+			
+			if (idx > rarr) {
+				printf("Overflowing results.arr index\n");
+				exit(1);
+			}
+	
+			Entry  *ent = &entries.arr[j];
+			Result *res = &results.arr[idx];
+
+			res->size = ent->size * ent->reps;
+			if (res->size > TEXT_MAX_SIZE) {
+				printf("Overflowing results.arr.size\n");
+				printf("res->size: %zu, TEXT_MAX_SIZE: %d\n", res->size, TEXT_MAX_SIZE);
+				exit(1);
+			}
+
+			fill(
+				src_txt,
+				ent->text,
+				res->size);
+			
+			strcpy(
+				res->memcpy_name,
+				tested_memcpy.arr[i].name);
+			strcpy(
+				res->test_name,
+				ent->name);
+		
+			res->difftime = measure_time(
+				dst_txt,
+				src_txt,
+				res->size,
+				(size_t)(WARMUP_COUNT),
+				(size_t)(RUN_COUNT),
+				tested_memcpy.arr[i].func
+			);
+			idx ++;
+		}
+	}
+}
+
+int comp(const void *lhs_, const void *rhs_) {
+	const Result *lhs = (const Result *)lhs_;
+	const Result *rhs = (const Result *)rhs_;
+	
+	if (lhs->difftime == rhs->difftime)
+		return 0;
+
+	if (lhs->difftime >= rhs->difftime)
+		return 1;
+
+	return -1;
+}
+
+void generate_result_table() {
+	
+	qsort(
+		results.arr,
+		ARRAY_SIZE(results.arr),
+		sizeof(results.arr[0]),	
+		&comp);
+	
+	printf("RESULTS\n");
+	
+	for (int i=0; i < ARRAY_SIZE(results.arr); i++) {
+
+		const Result *res = &results.arr[i];
+		printf("TIME: %zu, SIZE: %zu, MEMCPY_NAME: %s, TEST_NAME: %s\n",
+		res->difftime, 
+		res->size,
+		res->memcpy_name,
+		res->test_name);
+	}
+}
+
+int main(void) {
 	cpu_set_t cpu_set; 
 	size_t cpuset_size = sizeof(cpu_set);
 	
@@ -49,39 +316,45 @@ int main() {
 		return 1;
 	}
 	
-	cpuid_t cpuid = dlsym(pu, "cpuid");
-	if (!cpuid) {
+	utils.cpuid_gcc = dlsym(pu, "cpuid_gcc");
+	if (!utils.cpuid_gcc) {
 		printf("dlopen error: %s\n", dlerror());
 		return 1;
 	}
 
-	cpuid_gcc_t cpuid_gcc = dlsym(pu, "cpuid_gcc");
-	if (!cpuid_gcc) {
-		printf("dlopen error: %s\n", dlerror());
-		return 1;
-	}
-
-	rdtsc_t rdtsc = dlsym(pu, "rdtsc");
-	if (!rdtsc) {
-		printf("dlopen error: %s\n", dlerror());
-		return 1;
-	}
-
-	rdtsc_intel_t rdtsc_intel = dlsym(pu, "rdtsc_intel");
-	if (!rdtsc_intel) {
-		printf("dlopen error: %s\n", dlerror());
-		return 1;
-	}
-
-	// Check if rdtsc and cpuid are available
-	Cpustat cpuid_ret = cpuid_gcc();
+	Cpustat cpuid_ret = utils.cpuid_gcc();
 	if (cpuid_ret.has_rdtsc == 0) {
 		printf("No rdtsc\n");
 		return 1;
 	}
 
 	if (cpuid_ret.has_invariant_tsc == 0) {
-		printf("No invariant TSC, unused for now\n");
+		printf("No invariant TSC, TODO: finish this\n");
+	}
+
+
+	utils.cpuid = dlsym(pu, "cpuid");
+	if (!utils.cpuid) {
+		printf("dlopen error: %s\n", dlerror());
+		return 1;
+	}
+
+	utils.cpuid_gcc = dlsym(pu, "cpuid_gcc");
+	if (!utils.cpuid_gcc) {
+		printf("dlopen error: %s\n", dlerror());
+		return 1;
+	}
+
+	utils.rdtsc = dlsym(pu, "rdtsc");
+	if (!utils.rdtsc) {
+		printf("dlopen error: %s\n", dlerror());
+		return 1;
+	}
+
+	utils.rdtsc_intel = dlsym(pu, "rdtsc_intel");
+	if (!utils.rdtsc_intel) {
+		printf("dlopen error: %s\n", dlerror());
+		return 1;
 	}
 
 	if (sched_setaffinity(pid, cpuset_size, &cpu_set) == -1) {
@@ -94,163 +367,118 @@ int main() {
 		return 1;
 	}
 
+	tested_memcpy.arr[0].func = memcpy;
+	strcpy(	tested_memcpy.arr[0].name,
+		"memcpy");
+
 	// LOAD MEMCOPY IMPLEMENTATIONS
 	void * f1 = dlopen("./cmemcpy.so",  RTLD_NOW);
 	void * f2 = dlopen("./cmemcpy2.so", RTLD_NOW);
-
-	memcpy_t cmemcpy  = dlsym(f1, "cmemcpy" );
-	memcpy_t cmemcpy2 = dlsym(f2, "cmemcpy2");
-
-	// TEST STRINGS
-	int ptests = 8;	
-	char *text[ptests+3];
-
-	text[8] = "This is the text I want you to copy for me";
-	text[9] = "This is an other text I also want you to copy. As you can see it's much longer than the previous one so that it will be harder to copy for a less-performant solution. I think this would be a good test for the solution too.";
-	text[10] = "6666666666";
-
-	char pattern1[] = "as6gn%z#d668";
-	char pattern2[] = "śg!@$%^63^fb";
 	
-	size_t pattern1_size = sizeof(pattern1) - 1;
-	size_t pattern2_size = sizeof(pattern1) - 1;
+	tested_memcpy.arr[1].func = dlsym(f1, "cmemcpy");
+	strcpy( tested_memcpy.arr[1].name,
+		"cmemcpy");
 
-	int reps;
+	tested_memcpy.arr[2].func = dlsym(f2, "cmemcpy2");
+	strcpy( tested_memcpy.arr[2].name,
+		"cmemcpy2");
 
-	char *pattern = pattern1;
-	size_t pattern_size = pattern1_size;
-	for (int i=1; i <= ptests; i++) {
-		if (i % 1) 
-			reps = 300;
-		if (i % 2)
-			reps = 1100;
-		if (i % 3)
-			reps = 6000;
-		if (i % 4)
-			reps = 1000;
-		if (i > 4) { 
-			pattern = pattern2;
-			pattern_size = pattern2_size;
-		}
-
-		text[i-1] = mallocnfill(pattern, pattern_size, reps);	
+	if (ARRAY_SIZE(entries.arr) != TEST_COUNT) {
+		printf("entries.arr not %d elements long\n", TEST_COUNT);
+		return 1;
 	}
 
-	// INIT
-	uint64_t rdtsc_v[8];
-	uint64_t rtest[4];
-
-	char * test_dest = (char *)malloc(131072);
-
-	int ctest__ = 11;
-	size_t tsize__;
-	char tname__[128];
-	char *tnum [] = {
-		"UNO",
-		"DOS",
-		"TRES",
-		"QUATRO",
-		"CINCO",
-		"SEIS",
-		"SIETE",
-		"OCHO",
-		"NUEVE",
-		"DIEZ",
-		"ONCE"
-	};
-
-	for (int i=0; i<ctest__; i++) {
-		
-		char wut_cp[64] = "PATTERN1";
-		if (i > 3) { 
-			strcpy(wut_cp, "PATTERN2");
-		}
-
-		if (i == 8) { 
-			strcpy(wut_cp, "SHORT STR");
-		} else if (i == 9) { 
-			strcpy(wut_cp, "SEMI-SHORT STR");
-		} else if (i == 10) { 
-			strcpy(wut_cp, "NUMBER");
-		}
-
-		tsize__ = strlen(text[i]) + 1;
-		sprintf(tname__, "NUMERO %s, MEMCPY %s", tnum[i], wut_cp);
+	strcpy(
+		entries.arr[0].name,
+		"SHORT_STR");
+	strcpy(
+		entries.arr[0].text,
+		"This is the text I want you to copy for me");
 	
-		cpuid();
-		asm volatile("":::"memory");
+	entries.arr[0].size = strlen(entries.arr[0].text);
+	entries.arr[0].reps = 1;	
+
+	strcpy(
+		entries.arr[1].name,
+		"LONGER_STR");
+	strcpy(
+		entries.arr[1].text,
+		"This is an other text I also want you to copy. "
+		"As you can see it's much longer than the previous "
+		"one so that it will be harder to copy for a "
+		"less-performant solution. I think this would be a "
+		"good test for the solution too.");
+
+	entries.arr[1].size = strlen(entries.arr[1].text);
+	entries.arr[1].reps = 1;	
+
+	strcpy(
+		entries.arr[2].name,
+		"66666666");
+	strcpy(
+		entries.arr[2].text,
+		"6");
+
+	entries.arr[2].size = strlen(entries.arr[2].text);
+	entries.arr[2].reps = 8;	
+
+	size_t rarr = ARRAY_SIZE(results.arr), \ 
+	tarr = ARRAY_SIZE(entries.arr), \
+	result_size;
+
+	_Static_assert( PATTERN_COUNT        == 2,
+			"Incorrect pattern count, not equal " STRINGIFY(PATTERN_COUNT));	
+	_Static_assert( PATTERN_REPEAT_COUNT == 4,
+			"Incorrect pattern count, not equal " STRINGIFY(PATTERN_REPEAT_COUNT));	
+
+	int i = SINGLE_TEST_COUNT;
+	for(i; i < (PATTERN_REPEAT_COUNT + SINGLE_TEST_COUNT); i++) {
 	
-		// Naive
-		for(int j=0; j<666; j++) {
-			cmemcpy(test_dest, text[i], tsize__);
-		}
-		
-		rdtsc_v[0] = rdtsc();
-		for(int j=0; j<1000; j++) {
-			cmemcpy(test_dest, text[i], tsize__);
-		}
-		
-		cpuid();
-		asm volatile("":::"memory");
-		rdtsc_v[1] = rdtsc();
-		
-		// Butter
-		for(int j=0; j<666; j++) {
-			cmemcpy2(test_dest, text[i], tsize__);
-		}
+		strcpy(
+			entries.arr[i].name,
+			"PATTERN 0");
+		strcpy(
+			entries.arr[i].text,
+			"śg!@$%^63^fb");
+	
+		entries.arr[i].size = strlen(entries.arr[i].text);
 
-		rdtsc_v[2] = rdtsc();
-		for(int j=0; j<1000; j++) {
-			cmemcpy2(test_dest, text[i], tsize__);
-		}
-		cpuid();
-		asm volatile("":::"memory");
-		rdtsc_v[3] = rdtsc();
-		
-		// Libc
-		for(int j=0; j<666; j++) {
-			memcpy(test_dest, text[i], tsize__);
-		}
+	
+		strcpy(
+			entries.arr[i].text,
+			"as6gn%z#d668");
 
-		rdtsc_v[4] = rdtsc();
-		for(int j=0; j<1000; j++) {
-			memcpy(test_dest, text[i], tsize__);
-		}
-		cpuid();
-		asm volatile("":::"memory");
-		rdtsc_v[5] = rdtsc();
-		
-
-		// TODO: Replace
-		for(int j=0; j<666; j++) {
-			cmemcpy2(test_dest, text[i], tsize__);
-		}
-
-		rdtsc_v[6] = rdtsc();
-		for(int j=0; j<1000; j++) {
-			cmemcpy2(test_dest, text[i], tsize__);
-		}
-		cpuid();
-		asm volatile("":::"memory");
-		rdtsc_v[7] = rdtsc();	
-
-		rtest[0] =  (rdtsc_v[1] - rdtsc_v[0])/1000;
-		rtest[1] =  (rdtsc_v[3] - rdtsc_v[2])/1000;
-		rtest[2] =  (rdtsc_v[5] - rdtsc_v[4])/1000;
-		rtest[3] =  (rdtsc_v[7] - rdtsc_v[6])/1000;
-
-		printf("%s:\n",		         tname__);
-		printf("LENGHT: %zu BYTES\n",    tsize__);
-		printf("\tcmemcpy: %"	       PRIu64 "\n", rtest[0]);
-		printf("\tcmemcpy2: %" 	       PRIu64 "\n", rtest[1]);
-		printf("\tmemcpy (libc): %"    PRIu64 "\n", rtest[2]);
-		printf("\tcmemcpy3: %" PRIu64 "\n", rtest[3]);
+		entries.arr[i].size = strlen(entries.arr[i].text);
+		entries.arr[i].reps = generate_pattern_reps(&entries.arr[i]);
 	}
 
+	int newmax = i + PATTERN_REPEAT_COUNT;
+	for(i; i < newmax; i++) {
 	
-	free(test_dest);
-	for (int i=0; i < ptests; i++) {
-		free(text[i]);
+		strcpy(
+			entries.arr[i].name,
+			"PATTERN 1");
+		
+		strcpy(
+			entries.arr[i].text,
+			"as6gn%z#d668");
+
+		entries.arr[i].size = strlen(entries.arr[i].text);
+		entries.arr[i].reps = generate_pattern_reps(&entries.arr[i]);
 	}
+	
+	if (rarr != FULL_TEST_COUNT) {
+		printf("results.arr not %d elements long\n", FULL_TEST_COUNT);
+		return 1;
+	}
+
+	// Base structs generated, proceeding to test memcpy set 
+	test_memcpy_set();
+	
+	printf("Test count: %d\nResults struct size: %zu\n", TEST_COUNT, sizeof(results));
+
+	// Print results
+	generate_result_table();
+
 	return 0;
 }
