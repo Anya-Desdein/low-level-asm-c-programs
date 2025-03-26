@@ -4,7 +4,7 @@ SHELL = /bin/sh
 
 CC := gcc
 
-FLAGS = -O0 -g3 -ggdb -fno-strict-aliasing -fno-tree-dce -march=native -Wall -Wextra -std=gnu17
+FLAGS = -O0 -g3 -ggdb -fno-strict-aliasing -fno-tree-dce -march=native -Wall -Wextra -std=gnu17 -lm
 SRD_FLAGS = -shared -fPIC
 
 SRC = tests

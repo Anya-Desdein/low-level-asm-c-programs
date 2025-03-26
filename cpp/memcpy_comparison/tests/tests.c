@@ -34,6 +34,8 @@
 #define TEST_COUNT		((SINGLE_TEST_COUNT) + ((PATTERN_COUNT) * (PATTERN_REPEAT_COUNT)))
 #define FULL_TEST_COUNT		(TEST_COUNT * MEMCPY_COUNT)
 
+#define COLOR_MAX_SIZE		512
+
 // positive value ? -1 : 0
 // -1 is invalid size
 #define BUILD_BUG_ON_ZERO(expr) ((int)(sizeof(struct { int:(-!!(expr)); })))
@@ -260,10 +262,21 @@ void test_memcpy_set(){
 	}
 }
 
-int comp(const void *lhs_, const void *rhs_) {
+char *generate_line(size_t character_count, char symbol) {
+
+	char *line_pt = malloc(character_count+1);
+	
+	for (size_t i=0; i < character_count; i++) {
+		line_pt[i] = symbol;
+	} line_pt[character_count] = '\0';
+	
+	return line_pt;
+}
+
+int test_type_comp(const void *lhs_, const void *rhs_) {
 	const Result *lhs = (const Result *)lhs_;
 	const Result *rhs = (const Result *)rhs_;
-	
+
 	if (lhs->difftime == rhs->difftime)
 		return 0;
 
@@ -273,28 +286,83 @@ int comp(const void *lhs_, const void *rhs_) {
 	return -1;
 }
 
-void generate_result_table() {
+size_t count_digits(size_t num) {
+
+	if (num < 0)
+		return -1;
+	if (num == 0)
+		return  1;
 	
+	return 	(size_t)
+		(
+		ceil(
+		log10(num) + 1)
+		);
+}
+
+void generate_result_table() {
+
+	size_t res_size = ARRAY_SIZE(results.arr);
+
+	size_t max_memcpy	= 0; 
+	size_t max_test		= 0; 
+	size_t max_size 	= 0; 
+	size_t max_difftime	= 0; 
+
+	for (int i=0; i < res_size; i++) {
+	
+		const Result *res    = &results.arr[i];
+		      size_t  test__ =  strlen(res->test_name);
+		      size_t  mmcp__ =  strlen(res->memcpy_name);
+
+		if (res->difftime > max_difftime)
+			max_difftime = res->difftime;
+		if (res->size > max_size) 
+			max_size     = res->size;
+		if (test__ > max_test)
+			max_test     = test__;
+		if (mmcp__ > max_memcpy)
+			max_memcpy   = mmcp__;
+	}
+	
+	max_size     = count_digits(max_size);
+	max_difftime = count_digits(max_difftime);
+	
+	printf("MEM: %zu, TST: %zu, SIZ: %zu, DIF: %zu\n", max_memcpy, max_test, max_size, max_difftime);
+	//size_t line_width = max_memcpy + max_test + max_size + max_difftime;
+	//char *line = generate_line(line_width, '-');
+
 	qsort(
 		results.arr,
 		ARRAY_SIZE(results.arr),
 		sizeof(results.arr[0]),	
-		&comp);
+		&test_type_comp);
 	
 	printf("RESULTS\n");
-	
-	for (int i=0; i < ARRAY_SIZE(results.arr); i++) {
+
+	//printf("%s\n", line);
+	printf("TIME: \t\tSIZE:\t\tMEMCPY_NAME:\t\tTEST_NAME:\n");
+
+	char color[COLOR_MAX_SIZE];
+	char color_end[] = "\x1b[0m";
+
+
+	for (int i=0; i < res_size; i++) {
 
 		const Result *res = &results.arr[i];
-		printf("TIME: %zu, SIZE: %zu, MEMCPY_NAME: %s, TEST_NAME: %s\n",
-		res->difftime, 
-		res->size,
-		res->memcpy_name,
-		res->test_name);
+	
+		int c_type = 3;
+		sprintf(color, "\x1b[3%dm", c_type);
+
+		printf("%zu  \t\t", 	res->difftime);
+		printf("%zu  \t\t", 	res->size);
+		printf("%s   \t\t",	res->memcpy_name);
+		printf("%s   \n", 		res->test_name);
 	}
 }
 
 int main(void) {
+
 	cpu_set_t cpu_set; 
 	size_t cpuset_size = sizeof(cpu_set);
 	
