@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #include <dlfcn.h> 	// dynamic linking library 
 
@@ -273,14 +274,22 @@ char *generate_line(size_t character_count, char symbol) {
 	return line_pt;
 }
 
-int test_type_comp(const void *lhs_, const void *rhs_) {
+int type_comp(const void *lhs_, const void *rhs_) {
 	const Result *lhs = (const Result *)lhs_;
 	const Result *rhs = (const Result *)rhs_;
 
-	if (lhs->difftime == rhs->difftime)
-		return 0;
+	if (lhs->test_name == rhs->test_name) {
 
-	if (lhs->difftime >= rhs->difftime)
+		if (lhs->difftime == rhs->difftime)
+			return 0;
+
+		if (lhs->difftime >= rhs->difftime)
+			return 1;
+
+		return -1;
+	}
+
+	if (lhs->test_name >= rhs->test_name)
 		return 1;
 
 	return -1;
@@ -302,62 +311,135 @@ size_t count_digits(size_t num) {
 
 void generate_result_table() {
 
+	typedef struct {
+		size_t memcpy;	
+		size_t test;	 
+		size_t size; 
+		size_t diff;	 
+	} Disp;
+	Disp spaces_count = {0}, max = {0};
+	assert(sizeof(Disp) == 32 && "Display structure not size 32");	
+
+	struct {
+		size_t 	size;
+		size_t 	diff;
+		char   *memcpy;
+		char   *test;
+	} disp;
+	assert(sizeof(disp) == 32 && "disp structure instance not size 32");	
+
+	struct {
+		char *memcpy;	
+		char *test;	
+		char *size;	
+		char *diff;	
+	} spaces;
+	assert(sizeof(Disp) == 32 && "Spaces structure not size 32");	
+
 	size_t res_size = ARRAY_SIZE(results.arr);
 
-	size_t max_memcpy	= 0; 
-	size_t max_test		= 0; 
-	size_t max_size 	= 0; 
-	size_t max_difftime	= 0; 
-
+	size_t disp_count = 4;
+	
 	for (int i=0; i < res_size; i++) {
 	
-		const Result *res    = &results.arr[i];
-		      size_t  test__ =  strlen(res->test_name);
-		      size_t  mmcp__ =  strlen(res->memcpy_name);
+		const Result *res = &results.arr[i];
+			
+		if (!res->memcpy_name || !res->test_name || !res->difftime || !res->size)
+			exit(1);
 
-		if (res->difftime > max_difftime)
-			max_difftime = res->difftime;
-		if (res->size > max_size) 
-			max_size     = res->size;
-		if (test__ > max_test)
-			max_test     = test__;
-		if (mmcp__ > max_memcpy)
-			max_memcpy   = mmcp__;
+		size_t  test__ =  strlen(res->test_name);
+		size_t  mmcp__ =  strlen(res->memcpy_name);
+
+		printf("res->test_name: %s\n", res->test_name);
+		printf("test__: %d\n", test__);
+		
+		//printf("res->memcpy_name: %s\n", res->memcpy_name);
+		//printf("mmcp__: %d\n", mmcp__);
+		printf("Max test %zu\n", max.test);
+
+		if (res->difftime > max.diff)
+			max.diff     = res->difftime;
+		if (res->size	  > max.size) 
+			max.size     = res->size;
+		if (test__ 	  > max.test)
+			max.test     = test__;
+		if (mmcp__ 	  > max.memcpy)
+			max.memcpy   = mmcp__;
 	}
-	
-	max_size     = count_digits(max_size);
-	max_difftime = count_digits(max_difftime);
-	
-	printf("MEM: %zu, TST: %zu, SIZ: %zu, DIF: %zu\n", max_memcpy, max_test, max_size, max_difftime);
-	//size_t line_width = max_memcpy + max_test + max_size + max_difftime;
-	//char *line = generate_line(line_width, '-');
+	printf("Max test %zu\n", max.test);
 
+	max.size = count_digits(max.size);
+	max.diff = count_digits(max.diff);
+
+	printf("Size digits: %zu, Diff digits: %zu\n", max.size, max.diff);
+	size_t column_len = 0;
+	printf("column_len: %zu\n", column_len);
+
+	if (column_len < max.memcpy) {
+		column_len = max.memcpy;
+		printf("Memcpy: %zu\n", max.memcpy);
+	}
+	if (column_len < max.test) {
+		column_len = max.test;
+		printf("Test: %zu\n", max.test);
+	}
+	if (column_len < max.size) {
+		column_len = max.size;
+		printf("Size: %zu\n", max.size);
+	}
+	if (column_len < max.diff) { 
+		column_len = max.diff;
+		printf("Diff: %zu\n", max.diff);
+	}
+	printf("column_len: %zu\n", column_len);
+	column_len += 0; // set padding between columns
+	printf("Column len: %zu\n", column_len);
+	size_t line_width = column_len * disp_count;
+	char  *line_arr   = generate_line(line_width, '-');
+
+	printf("dupa\n");
 	qsort(
 		results.arr,
 		ARRAY_SIZE(results.arr),
 		sizeof(results.arr[0]),	
-		&test_type_comp);
+		&type_comp);
 	
-	printf("RESULTS\n");
-
-	//printf("%s\n", line);
+	printf("RESULTS\n");	
 	printf("TIME: \t\tSIZE:\t\tMEMCPY_NAME:\t\tTEST_NAME:\n");
+	printf("%s\n", line_arr);
 
 	char color[COLOR_MAX_SIZE];
 	char color_end[] = "\x1b[0m";
-
-
 	for (int i=0; i < res_size; i++) {
 
 		const Result *res = &results.arr[i];
+		
+		if (!column_len || column_len == 0)
+			return;
+
+		disp.memcpy  		= res->memcpy_name,
+		disp.test		= res->test_name;
+		disp.size		= res->size,
+		disp.diff		= res->difftime;
+
+		spaces_count.memcpy	= column_len - strlen      (disp.memcpy); 
+		spaces_count.test	= column_len - strlen	   (disp.test); 
+		spaces_count.size 	= column_len - count_digits(disp.size); 
+		spaces_count.diff	= column_len - count_digits(disp.diff); 
+
+		spaces.memcpy		= generate_line(spaces_count.memcpy, ' ');
+		spaces.test		= generate_line(spaces_count.test,   ' ');
+		spaces.size 		= generate_line(spaces_count.size,   ' ');
+		spaces.diff		= generate_line(spaces_count.diff,   ' ');
 	
 		int c_type = 3;
 		sprintf(color, "\x1b[3%dm", c_type);
 
-		printf("%zu  \t\t", 	res->difftime);
-		printf("%zu  \t\t", 	res->size);
-		printf("%s   \t\t",	res->memcpy_name);
-		printf("%s   \n", 		res->test_name);
+		printf("%s%s",		disp.memcpy,	   	 spaces.memcpy);
+		printf("%zu%s", 	disp.diff, 	 	 spaces.diff);
+		printf("%zu%s", 	disp.size, 	 	 spaces.size);
+		printf("%s%s", 		disp.test,		 spaces.test);
+		puts("");
 	}
 }
 
@@ -510,7 +592,6 @@ int main(void) {
 			"śg!@$%^63^fb");
 	
 		entries.arr[i].size = strlen(entries.arr[i].text);
-
 	
 		strcpy(
 			entries.arr[i].text,
