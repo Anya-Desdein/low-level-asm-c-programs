@@ -302,12 +302,22 @@ void print_column_el(size_t column_len, char *str, char *align) {
 		padding_size = padding_size/2;
 
 	char  *padding  = generate_symbols(padding_size, ' ');	
-	
+
+	       char color_str[COLOR_MAX_SIZE];
+	static int  r = 255;
+	static int  g = 255;
+	static int  b = 255;
+	sprintf(color_str, "\033[38;2;%d;%d;%dm", r, g, b);
+
 	if (strcmp(align, "center") == 0) 
-		printf("%s%s%s", padding, str, padding);
+		printf("%s%s%s%s", color_str, padding, str, padding);
 		
 	if (strcmp(align, "left") == 0) 
-		printf("%s%s", str, padding);
+		printf("%s%s%s", color_str, str, padding);
+	
+	r--;
+	g--;
+	b--;
 }
 
 int type_comp(const void *lhs_, const void *rhs_) {
@@ -425,8 +435,6 @@ void generate_result_table() {
 	puts("");
 	printf("%s\n", line_arr);
 
-	char color[COLOR_MAX_SIZE];
-	char color_end[] = "\x1b[0m";
 	for (int i=0; i < res_size; i++) {
 
 		const Result *res = &results.arr[i];
@@ -438,11 +446,7 @@ void generate_result_table() {
 
 		sprintf(diff, "%zu", res->difftime);
 		sprintf(size, "%zu", res->size);
-
-		// TODO: add colors
-		int c_type = 3;
-		sprintf(color, "\x1b[3%dm", c_type);
-
+		
 		char disp_align[] = "left";
 		print_column_el(column_len, diff, disp_align);
 		print_column_el(column_len, size, disp_align);
