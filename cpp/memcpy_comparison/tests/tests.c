@@ -314,7 +314,7 @@ int type_comp(const void *lhs_, const void *rhs_) {
 	const Result *lhs = (const Result *)lhs_;
 	const Result *rhs = (const Result *)rhs_;
 
-	if (lhs->test_name == rhs->test_name) {
+	if (strcmp(lhs->test_name, rhs->test_name) == 0) {
 
 		if (lhs->difftime == rhs->difftime)
 			return 0;
@@ -325,7 +325,7 @@ int type_comp(const void *lhs_, const void *rhs_) {
 		return -1;
 	}
 
-	if (lhs->test_name >= rhs->test_name)
+	if (strcmp(lhs->test_name, rhs->test_name) > 0)
 		return 1;
 
 	return -1;
