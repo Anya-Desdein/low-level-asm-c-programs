@@ -263,7 +263,7 @@ void test_memcpy_set(){
 	}
 }
 
-char *generate_line(size_t character_count, char symbol) {
+char *generate_symbols(size_t character_count, char symbol) {
 
 	char *line_pt = malloc(character_count+1);
 	
@@ -374,9 +374,9 @@ void generate_result_table() {
 	if (column_len < max.diff)  
 		column_len = max.diff;
 	
-	column_len += 0; // set padding between columns
-	size_t line_width = column_len * disp_count;
-	char  *line_arr   = generate_line(line_width, '-');
+	column_len += 2; // set padding between columns
+	size_t table_len = column_len * disp_count;
+	char  *line_arr   = generate_symbols(table_len, '-');
 
 	qsort(
 		results.arr,
@@ -384,8 +384,32 @@ void generate_result_table() {
 		sizeof(results.arr[0]),	
 		&type_comp);
 	
-	printf("RESULTS\n");	
-	printf("TIME: \t\tSIZE:\t\tMEMCPY_NAME:\t\tTEST_NAME:\n");
+	size_t padding_left_results_size = (table_len - strlen("RESULTS"))/2;
+	char  *padding_left_results      = generate_symbols(padding_left_results_size, ' ');
+	printf("%sRESULTS\n", padding_left_results);
+
+	if (!column_len || column_len == 0)
+		return;
+
+
+	size_t padding_left_time_size   = (column_len - strlen("TIME:"));
+	char  *padding_left_time        = generate_symbols(padding_left_time_size, ' ');
+
+	size_t padding_left_size_size   = (column_len - strlen("SIZE:"));
+	char  *padding_left_size        = generate_symbols(padding_left_size_size, ' ');
+
+	size_t padding_left_memcpy_size = (column_len - strlen("MEMCPY:"));
+	char  *padding_left_memcpy      = generate_symbols(padding_left_memcpy_size, ' ');
+
+	size_t padding_left_test_size 	= (column_len - strlen("TEST:"));
+	char  *padding_left_test      	= generate_symbols(padding_left_test_size, ' ');
+
+	printf("TIME:%sSIZE:%sMEMCPY:%sTEST:%s\n", 
+		padding_left_time, 
+		padding_left_size,
+		padding_left_memcpy,
+		padding_left_test);
+
 	printf("%s\n", line_arr);
 
 	char color[COLOR_MAX_SIZE];
@@ -407,10 +431,10 @@ void generate_result_table() {
 		spaces_count.size 	= column_len - count_digits(disp.size); 
 		spaces_count.diff	= column_len - count_digits(disp.diff); 
 
-		spaces.memcpy		= generate_line(spaces_count.memcpy, ' ');
-		spaces.test		= generate_line(spaces_count.test,   ' ');
-		spaces.size 		= generate_line(spaces_count.size,   ' ');
-		spaces.diff		= generate_line(spaces_count.diff,   ' ');
+		spaces.memcpy		= generate_symbols(spaces_count.memcpy, ' ');
+		spaces.test		= generate_symbols(spaces_count.test,   ' ');
+		spaces.size 		= generate_symbols(spaces_count.size,   ' ');
+		spaces.diff		= generate_symbols(spaces_count.diff,   ' ');
 	
 		int c_type = 3;
 		sprintf(color, "\x1b[3%dm", c_type);
