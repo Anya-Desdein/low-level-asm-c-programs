@@ -54,6 +54,18 @@
 #define STRINGIFY__(x) #x
 #define STRINGIFY(x)  STRINGIFY__(x)
 
+typedef struct {
+	int r;
+	int g;
+	int b;
+} RGB;
+
+typedef struct {
+	int h;
+	int s;
+	int v;
+} HSV;
+
 struct {
 	rdtsc_t 	rdtsc;
 	rdtsc_intel_t	rdtsc_intel;
@@ -279,6 +291,47 @@ char *generate_symbols(size_t character_count, char symbol) {
 	return line_pt;
 }
 
+RGB hsv_to_rgb(HSV hsv) {
+	
+	assert((hsv.h >= 0 && hsv.h <= 360 && hsv.h == floor(hsv.h)) && "Error in hsv_to_rgb: invalid h");	
+	assert((hsv.s >= 0 && hsv.s <= 100 && hsv.s == floor(hsv.s)) && "Error in hsv_to_rgb: invalid s");	
+	assert((hsv.v >= 0 && hsv.v <= 100 && hsv.v == floor(hsv.v)) && "Error in hsv_to_rgb: invalid v");	
+
+	RGB rgb = {0};
+	
+	float h = (float)hsv.h/360,
+	      s = (float)hsv.s/100, 
+	      v = (float)hsv.v/100,
+	      r = 0,
+	      g = 0, 
+	      b = 0;
+	
+	float i = floor(h *  6),
+	      f =       h *  6 - i,
+	      p =       v * (1 - f * s),
+	      q =       v * (1 - f * s),
+	      t =       v * (1 - (1 - f) * s);
+
+	switch((int)i % 6) {
+		case 0: r = v; g = t; b = p; break;
+		case 1:	r = q; g = v; b = p; break;
+		case 2:	r = p; g = v; b = t; break;
+		case 3: r = p; g = q; b = v; break;
+		case 4: r = t; g = p; b = v; break;
+		case 5: r = v; g = p; b = q; break;
+	}
+
+	rgb.r = (int)(r * 255);
+	rgb.g = (int)(g * 255);
+	rgb.b = (int)(b * 255);
+
+	assert((rgb.r >= 0 && rgb.r < 256) && "Error in hsv_to_rgb: invalid r");	
+	assert((rgb.g >= 0 && rgb.g < 256) && "Error in hsv_to_rgb: invalid g");	
+	assert((rgb.b >= 0 && rgb.b < 256) && "Error in hsv_to_rgb: invalid b");	
+
+	return rgb;
+}
+
 /* 
 Fn to print element of a column
 ARGS: 
@@ -288,7 +341,7 @@ ARGS:
 This will NOT automatically include NEWLINE 
 So that you can have multi-column out
 */
-void print_column_el(size_t column_len, char *str, char *align) {
+void print_column_el(size_t column_len, char *str, char *align, HSV hsv) {
 
 	assert(column_len && "Error in print_column_el: missing argument column_len");	
 	assert(str	  && "Error in print_column_el: missing argument str");	
@@ -303,21 +356,17 @@ void print_column_el(size_t column_len, char *str, char *align) {
 
 	char  *padding  = generate_symbols(padding_size, ' ');	
 
-	       char color_str[COLOR_MAX_SIZE];
-	static int  r = 255;
-	static int  g = 255;
-	static int  b = 255;
-	sprintf(color_str, "\033[38;2;%d;%d;%dm", r, g, b);
+	char color_str[COLOR_MAX_SIZE];
+
+	RGB rgb = hsv_to_rgb(hsv);
+	
+	sprintf(color_str, "\033[38;2;%d;%d;%dm", rgb.r, rgb.g, rgb.b);
 
 	if (strcmp(align, "center") == 0) 
 		printf("%s%s%s%s", color_str, padding, str, padding);
 		
 	if (strcmp(align, "left") == 0) 
 		printf("%s%s%s", color_str, str, padding);
-	
-	r--;
-	g--;
-	b--;
 }
 
 int type_comp(const void *lhs_, const void *rhs_) {
@@ -415,7 +464,10 @@ void generate_result_table() {
 	
 	char header[]       = "RESULTS";
 	char header_align[] = "center";
-	print_column_el(table_len, header, header_align);
+	
+	// h.max = 360, s.max = 100, v.max = 100
+	HSV hsv = {.h = 360, .s = 100, .v = 100};
+	print_column_el(table_len, header, header_align, hsv);
 	puts("");
 
 	if (!column_len || column_len == 0)
@@ -430,9 +482,14 @@ void generate_result_table() {
 	};
 	size_t subh_size = ARRAY_SIZE(subh);
 
-	for (size_t i=0; i < subh_size; i++)
-		print_column_el(column_len, subh[i], subh_align);
-	puts("");
+	for (size_t i=0; i < subh_size; i++) {
+
+		if (hsv.h > 10) 	
+			hsv.h -= 10;
+
+		print_column_el(column_len, subh[i], subh_align, hsv);
+
+	} puts("");
 	printf("%s\n", line_arr);
 
 	for (int i=0; i < res_size; i++) {
@@ -448,10 +505,10 @@ void generate_result_table() {
 		sprintf(size, "%zu", res->size);
 		
 		char disp_align[] = "left";
-		print_column_el(column_len, diff, disp_align);
-		print_column_el(column_len, size, disp_align);
-		print_column_el(column_len, memcpy, disp_align);
-		print_column_el(column_len, test, disp_align);
+		print_column_el(column_len, diff,   disp_align, hsv);
+		print_column_el(column_len, size,   disp_align, hsv);
+		print_column_el(column_len, memcpy, disp_align, hsv);
+		print_column_el(column_len, test,   disp_align, hsv);
 		puts("");
 	
 		}
@@ -638,8 +695,6 @@ int main(void) {
 	// Base structs generated, proceeding to test memcpy set 
 	test_memcpy_set();
 	
-	//printf("Test count: %d\nResults struct size: %zu\n", TEST_COUNT, sizeof(results));
-
 	// Print results
 	generate_result_table();
 
