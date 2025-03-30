@@ -214,7 +214,7 @@ void test_memcpy_set(){
 		exit(1);
 	}
 
-	printf("marr: %zu tarr: %zu, rarr: %zu\n", marr, tarr, rarr);
+	//printf("marr: %zu tarr: %zu, rarr: %zu\n", marr, tarr, rarr);
 
 	int   idx 	 = 0;
 	char *src_txt    = (char *)malloc(TEXT_MAX_SIZE);
@@ -233,8 +233,13 @@ void test_memcpy_set(){
 
 			res->size = ent->size * ent->reps;
 			if (res->size > TEXT_MAX_SIZE) {
+			
 				printf("Overflowing results.arr.size\n");
-				printf("res->size: %zu, TEXT_MAX_SIZE: %d\n", res->size, TEXT_MAX_SIZE);
+				
+				printf("res->size: %zu, TEXT_MAX_SIZE: %d\n",
+				res->size,
+				TEXT_MAX_SIZE);
+				
 				exit(1);
 			}
 
@@ -274,6 +279,37 @@ char *generate_symbols(size_t character_count, char symbol) {
 	return line_pt;
 }
 
+/* 
+Fn to print element of a column
+ARGS: 
+	column length,
+	pointer to string you want to print,
+	alignment (center, left);
+This will NOT automatically include NEWLINE 
+So that you can have multi-column out
+*/
+void print_column_el(size_t column_len, char *str, char *align) {
+
+	assert(column_len && "Error in print_column_el: missing argument column_len");	
+	assert(str	  && "Error in print_column_el: missing argument str");	
+	assert(align	  && "Error in print_column_el: missing argument align");	
+
+	assert((align != "center" && align != "left")
+		&& "Error in print_column_el: incorrect argument align");		
+	
+	size_t padding_size  = (column_len - strlen(str));
+	if (strcmp(align, "center") == 0) 
+		padding_size = padding_size/2;
+
+	char  *padding  = generate_symbols(padding_size, ' ');	
+	
+	if (strcmp(align, "center") == 0) 
+		printf("%s%s%s", padding, str, padding);
+		
+	if (strcmp(align, "left") == 0) 
+		printf("%s%s", str, padding);
+}
+
 int type_comp(const void *lhs_, const void *rhs_) {
 	const Result *lhs = (const Result *)lhs_;
 	const Result *rhs = (const Result *)rhs_;
@@ -311,35 +347,20 @@ size_t count_digits(size_t num) {
 
 void generate_result_table() {
 
-	typedef struct {
+	size_t table_len  = 0, column_len = 0;
+	struct {
 		size_t memcpy;	
-		size_t test;	 
-		size_t size; 
-		size_t diff;	 
-	} Disp;
-	Disp spaces_count = {0}, max = {0};
-	assert(sizeof(Disp) == 32 && "Display structure not size 32");	
-
-	struct {
-		size_t 	size;
-		size_t 	diff;
-		char   *memcpy;
-		char   *test;
-	} disp;
-	assert(sizeof(disp) == 32 && "disp structure instance not size 32");	
-
-	struct {
-		char *memcpy;	
-		char *test;	
-		char *size;	
-		char *diff;	
-	} spaces;
-	assert(sizeof(Disp) == 32 && "Spaces structure not size 32");	
+		size_t test;	
+		size_t size;	
+		size_t diff;	
+	} max = {0};
+	assert( sizeof(max) == sizeof(size_t) * 4 && "Error in max struct: incorrect size");
+	
+	size_t column_count = sizeof(max)/ sizeof(size_t);
 
 	size_t res_size = ARRAY_SIZE(results.arr);
+	assert(res_size == FULL_TEST_COUNT && "Error in results.arr: incorrect size");	
 
-	size_t disp_count = 4;
-	
 	for (int i=0; i < res_size; i++) {
 	
 		const Result *res = &results.arr[i];
@@ -363,8 +384,6 @@ void generate_result_table() {
 	max.size = count_digits(max.size);
 	max.diff = count_digits(max.diff);
 
-	size_t column_len = 0;
-
 	if (column_len < max.memcpy) 
 		column_len = max.memcpy;
 	if (column_len < max.test) 
@@ -374,9 +393,9 @@ void generate_result_table() {
 	if (column_len < max.diff)  
 		column_len = max.diff;
 	
-	column_len += 2; // set padding between columns
-	size_t table_len = column_len * disp_count;
-	char  *line_arr   = generate_symbols(table_len, '-');
+	       column_len += 2; // set padding between columns
+	       table_len   = column_len * column_count;
+	char  *line_arr    = generate_symbols(table_len, '-');
 
 	qsort(
 		results.arr,
@@ -384,32 +403,26 @@ void generate_result_table() {
 		sizeof(results.arr[0]),	
 		&type_comp);
 	
-	size_t padding_left_results_size = (table_len - strlen("RESULTS"))/2;
-	char  *padding_left_results      = generate_symbols(padding_left_results_size, ' ');
-	printf("%sRESULTS\n", padding_left_results);
+	char header[]       = "RESULTS";
+	char header_align[] = "center";
+	print_column_el(table_len, header, header_align);
+	puts("");
 
 	if (!column_len || column_len == 0)
 		return;
+	
+	char subh_align[] = "left";
+	char *subh[] = {
+		"TIME:",
+		"SIZE:",
+		"MEMCPY:",
+		"TEST:"
+	};
+	size_t subh_size = ARRAY_SIZE(subh);
 
-
-	size_t padding_left_time_size   = (column_len - strlen("TIME:"));
-	char  *padding_left_time        = generate_symbols(padding_left_time_size, ' ');
-
-	size_t padding_left_size_size   = (column_len - strlen("SIZE:"));
-	char  *padding_left_size        = generate_symbols(padding_left_size_size, ' ');
-
-	size_t padding_left_memcpy_size = (column_len - strlen("MEMCPY:"));
-	char  *padding_left_memcpy      = generate_symbols(padding_left_memcpy_size, ' ');
-
-	size_t padding_left_test_size 	= (column_len - strlen("TEST:"));
-	char  *padding_left_test      	= generate_symbols(padding_left_test_size, ' ');
-
-	printf("TIME:%sSIZE:%sMEMCPY:%sTEST:%s\n", 
-		padding_left_time, 
-		padding_left_size,
-		padding_left_memcpy,
-		padding_left_test);
-
+	for (size_t i=0; i < subh_size; i++)
+		print_column_el(column_len, subh[i], subh_align);
+	puts("");
 	printf("%s\n", line_arr);
 
 	char color[COLOR_MAX_SIZE];
@@ -417,34 +430,27 @@ void generate_result_table() {
 	for (int i=0; i < res_size; i++) {
 
 		const Result *res = &results.arr[i];
-		
-		if (!column_len || column_len == 0)
-			return;
-
-		disp.memcpy  		= res->memcpy_name,
-		disp.test		= res->test_name;
-		disp.size		= res->size,
-		disp.diff		= res->difftime;
-
-		spaces_count.memcpy	= column_len - strlen      (disp.memcpy); 
-		spaces_count.test	= column_len - strlen	   (disp.test); 
-		spaces_count.size 	= column_len - count_digits(disp.size); 
-		spaces_count.diff	= column_len - count_digits(disp.diff); 
-
-		spaces.memcpy		= generate_symbols(spaces_count.memcpy, ' ');
-		spaces.test		= generate_symbols(spaces_count.test,   ' ');
-		spaces.size 		= generate_symbols(spaces_count.size,   ' ');
-		spaces.diff		= generate_symbols(spaces_count.diff,   ' ');
 	
+		char diff[TITLE_MAX_SIZE], size[TITLE_MAX_SIZE], memcpy[TITLE_MAX_SIZE], test[TITLE_MAX_SIZE];
+
+		strcpy(memcpy, res->memcpy_name);
+		strcpy(test,   res->test_name);
+
+		sprintf(diff, "%zu", res->difftime);
+		sprintf(size, "%zu", res->size);
+
+		// TODO: add colors
 		int c_type = 3;
 		sprintf(color, "\x1b[3%dm", c_type);
 
-		printf("%s%s",		disp.memcpy,	   	 spaces.memcpy);
-		printf("%zu%s", 	disp.diff, 	 	 spaces.diff);
-		printf("%zu%s", 	disp.size, 	 	 spaces.size);
-		printf("%s%s", 		disp.test,		 spaces.test);
+		char disp_align[] = "left";
+		print_column_el(column_len, diff, disp_align);
+		print_column_el(column_len, size, disp_align);
+		print_column_el(column_len, memcpy, disp_align);
+		print_column_el(column_len, test, disp_align);
 		puts("");
-	}
+	
+		}
 }
 
 int main(void) {
@@ -460,9 +466,9 @@ int main(void) {
 
 	pid_t pid = getpid();
 	
-	printf("CPU_SET MASK SIZE: %zu BYTES\n",    cpuset_size);
-	printf("TOTAL CPU COUNT: %d, ONLINE: %d\n", all_cpus, online_cpus);
-	printf("CURRENT PROCESS ID: %d\n",          (int)pid);
+	//printf("CPU_SET MASK SIZE: %zu BYTES\n",    cpuset_size);
+	//printf("TOTAL CPU COUNT: %d, ONLINE: %d\n", all_cpus, online_cpus);
+	//printf("CURRENT PROCESS ID: %d\n",          (int)pid);
 
 	void *pu = dlopen("./perf_utils.so", RTLD_NOW);
 	if (!pu) {
@@ -628,7 +634,7 @@ int main(void) {
 	// Base structs generated, proceeding to test memcpy set 
 	test_memcpy_set();
 	
-	printf("Test count: %d\nResults struct size: %zu\n", TEST_COUNT, sizeof(results));
+	//printf("Test count: %d\nResults struct size: %zu\n", TEST_COUNT, sizeof(results));
 
 	// Print results
 	generate_result_table();
