@@ -350,13 +350,6 @@ void generate_result_table() {
 		size_t  test__ =  strlen(res->test_name);
 		size_t  mmcp__ =  strlen(res->memcpy_name);
 
-		printf("res->test_name: %s\n", res->test_name);
-		printf("test__: %d\n", test__);
-		
-		//printf("res->memcpy_name: %s\n", res->memcpy_name);
-		//printf("mmcp__: %d\n", mmcp__);
-		printf("Max test %zu\n", max.test);
-
 		if (res->difftime > max.diff)
 			max.diff     = res->difftime;
 		if (res->size	  > max.size) 
@@ -366,38 +359,25 @@ void generate_result_table() {
 		if (mmcp__ 	  > max.memcpy)
 			max.memcpy   = mmcp__;
 	}
-	printf("Max test %zu\n", max.test);
 
 	max.size = count_digits(max.size);
 	max.diff = count_digits(max.diff);
 
-	printf("Size digits: %zu, Diff digits: %zu\n", max.size, max.diff);
 	size_t column_len = 0;
-	printf("column_len: %zu\n", column_len);
 
-	if (column_len < max.memcpy) {
+	if (column_len < max.memcpy) 
 		column_len = max.memcpy;
-		printf("Memcpy: %zu\n", max.memcpy);
-	}
-	if (column_len < max.test) {
+	if (column_len < max.test) 
 		column_len = max.test;
-		printf("Test: %zu\n", max.test);
-	}
-	if (column_len < max.size) {
+	if (column_len < max.size) 
 		column_len = max.size;
-		printf("Size: %zu\n", max.size);
-	}
-	if (column_len < max.diff) { 
+	if (column_len < max.diff)  
 		column_len = max.diff;
-		printf("Diff: %zu\n", max.diff);
-	}
-	printf("column_len: %zu\n", column_len);
+	
 	column_len += 0; // set padding between columns
-	printf("Column len: %zu\n", column_len);
 	size_t line_width = column_len * disp_count;
 	char  *line_arr   = generate_line(line_width, '-');
 
-	printf("dupa\n");
 	qsort(
 		results.arr,
 		ARRAY_SIZE(results.arr),
