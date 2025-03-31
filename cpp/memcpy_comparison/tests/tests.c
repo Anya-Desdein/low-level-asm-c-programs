@@ -140,6 +140,14 @@ size_t generate_pattern_reps (
 	return reps;
 }
 
+int wrap(int value, int min, int max) {
+	
+	int range  =   max   - min,
+	    result = ((value - min) % range + range) % range + min;
+
+	return result;
+}
+
 void fill(
 	char *restrict const buffer, 
 	char *restrict const pattern,
@@ -341,7 +349,7 @@ ARGS:
 This will NOT automatically include NEWLINE 
 So that you can have multi-column out
 */
-void print_column_el(size_t column_len, char *str, char *align, HSV hsv) {
+void print_column_el(size_t column_len, char *str, char *align, HSV *hsv) {
 
 	assert(column_len && "Error in print_column_el: missing argument column_len");	
 	assert(str	  && "Error in print_column_el: missing argument str");	
@@ -356,17 +364,32 @@ void print_column_el(size_t column_len, char *str, char *align, HSV hsv) {
 
 	char  *padding  = generate_symbols(padding_size, ' ');	
 
-	char color_str[COLOR_MAX_SIZE];
+	char color_str[COLOR_MAX_SIZE], 
+	     color_reset[] = "\033[38;2;255;255;255m";
 
-	RGB rgb = hsv_to_rgb(hsv);
+	hsv->h = wrap(hsv->h - 5, 0, 360); 
+	RGB rgb = hsv_to_rgb(*hsv);
 	
-	sprintf(color_str, "\033[38;2;%d;%d;%dm", rgb.r, rgb.g, rgb.b);
+	sprintf(color_str, 
+		"\033[38;2;%d;%d;%dm", 
+		rgb.r, 
+		rgb.g, 
+		rgb.b);
 
 	if (strcmp(align, "center") == 0) 
-		printf("%s%s%s%s", color_str, padding, str, padding);
+		printf("%s%s%s%s%s", 
+			color_str, 
+			padding, 
+			str, 
+			padding, 
+			color_reset);
 		
 	if (strcmp(align, "left") == 0) 
-		printf("%s%s%s", color_str, str, padding);
+		printf("%s%s%s%s", 
+			color_str, 
+			str, 
+			padding, 
+			color_reset);
 }
 
 int type_comp(const void *lhs_, const void *rhs_) {
@@ -402,14 +425,6 @@ size_t count_digits(size_t num) {
 		ceil(
 		log10(num) + 1)
 		);
-}
-
-int wrap(int value, int min, int max) {
-	
-	int range  =   max   - min,
-	    result = ((value - min) % range + range) % range + min;
-
-	return result;
 }
 
 void generate_result_table() {
@@ -475,7 +490,7 @@ void generate_result_table() {
 	
 	// h.max = 360, s.max = 100, v.max = 100
 	HSV hsv = {.h = 360, .s = 100, .v = 100};
-	print_column_el(table_len, header, header_align, hsv);
+	print_column_el(table_len, header, header_align, &hsv);
 	puts("");
 
 	if (!column_len || column_len == 0)
@@ -490,13 +505,11 @@ void generate_result_table() {
 	};
 	size_t subh_size = ARRAY_SIZE(subh);
 
-	for (size_t i=0; i < subh_size; i++) {
-
-		hsv.h = wrap(hsv.h - 30, 0, 360); 
-		print_column_el(column_len, subh[i], subh_align, hsv);
-
-	} puts("");
-	printf("%s\n", line_arr);
+	for (size_t i=0; i < subh_size; i++)
+		print_column_el(column_len, subh[i], subh_align, &hsv);
+	puts("");
+	print_column_el(table_len, line_arr, header_align, &hsv);
+	puts("");
 
 	for (int i=0; i < res_size; i++) {
 
@@ -511,14 +524,10 @@ void generate_result_table() {
 		sprintf(size, "%zu", res->size);
 		
 		char disp_align[] = "left";
-		hsv.h = wrap(hsv.h - 30, 0, 360); 
-		print_column_el(column_len, diff,   disp_align, hsv);
-		hsv.h = wrap(hsv.h - 30, 0, 360); 
-		print_column_el(column_len, size,   disp_align, hsv);
-		hsv.h = wrap(hsv.h - 30, 0, 360); 
-		print_column_el(column_len, memcpy, disp_align, hsv);
-		hsv.h = wrap(hsv.h - 30, 0, 360); 
-		print_column_el(column_len, test,   disp_align, hsv);
+		print_column_el(column_len, diff,   disp_align, &hsv);
+		print_column_el(column_len, size,   disp_align, &hsv);
+		print_column_el(column_len, memcpy, disp_align, &hsv);
+		print_column_el(column_len, test,   disp_align, &hsv);
 		puts("");
 	
 		}
