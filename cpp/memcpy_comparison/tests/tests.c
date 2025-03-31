@@ -404,6 +404,14 @@ size_t count_digits(size_t num) {
 		);
 }
 
+int wrap(int value, int min, int max) {
+	
+	int range  =   max   - min,
+	    result = ((value - min) % range + range) % range + min;
+
+	return result;
+}
+
 void generate_result_table() {
 
 	size_t table_len  = 0, column_len = 0;
@@ -484,9 +492,7 @@ void generate_result_table() {
 
 	for (size_t i=0; i < subh_size; i++) {
 
-		if (hsv.h > 10) 	
-			hsv.h -= 10;
-
+		hsv.h = wrap(hsv.h - 30, 0, 360); 
 		print_column_el(column_len, subh[i], subh_align, hsv);
 
 	} puts("");
@@ -505,9 +511,13 @@ void generate_result_table() {
 		sprintf(size, "%zu", res->size);
 		
 		char disp_align[] = "left";
+		hsv.h = wrap(hsv.h - 30, 0, 360); 
 		print_column_el(column_len, diff,   disp_align, hsv);
+		hsv.h = wrap(hsv.h - 30, 0, 360); 
 		print_column_el(column_len, size,   disp_align, hsv);
+		hsv.h = wrap(hsv.h - 30, 0, 360); 
 		print_column_el(column_len, memcpy, disp_align, hsv);
+		hsv.h = wrap(hsv.h - 30, 0, 360); 
 		print_column_el(column_len, test,   disp_align, hsv);
 		puts("");
 	
