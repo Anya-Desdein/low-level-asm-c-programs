@@ -728,7 +728,8 @@ void generate_result_table() {
 		puts("");
 	
 	}
-
+	
+	free(subh_rows[0].array_pt);
 }
 
 int main(void) {
