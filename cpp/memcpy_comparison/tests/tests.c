@@ -313,7 +313,7 @@ RGB hsv_to_rgb2(HSV hsv) {
 	      s = (float)hsv.s/100, 
 	      v = (float)hsv.v/100,
 
-	      c = hsv.v * s,
+	      c = v * s,
 	      x = c * (1 - 
 	      	  fabs(
 		  	fmod((hsv.h / 60.0), 2) - 1)
@@ -478,7 +478,7 @@ size_t count_digits(size_t num) {
 	size_t max_text_size, 
 	char  *str 
 ) {
-	size_t   text_size = strlen(str);
+	size_t text_size = strlen(str);
 	
 	assert(text_size     && text_size     > 0    && "Invalid text argument in slice()");
 	assert(max_text_size && max_text_size > 0    && "Invalid max_text_size argument in slice()");
@@ -495,11 +495,12 @@ size_t count_digits(size_t num) {
 	double array_len__     = 
 		(double) text_size /
 		((double)sliced.element_len - 1);
+	printf("Array_len__ %f\n", array_len__);
 
-	sliced.array_len       = (size_t)ceil(array_len__);	
 	size_t  full_chunks    = (size_t)array_len__,
 		remainder      = text_size - array_len__ * sliced.element_len;
 
+	sliced.array_len       = (size_t)ceil(array_len__);	
 	sliced.array_pt        = calloc(sliced.array_len, sliced.element_len);
 	assert( sliced.array_pt 
 		&& sliced.array_pt != 0
@@ -657,12 +658,17 @@ void generate_result_table() {
       	subh_count = max_subh_rounded/column_len_raw;
 
 	SlicedArr subh_rows[subh_count];
+
 	size_t max_rows = 0;
 
+	assert(ARRAY_SIZE(subh) != subh_count 
+		&& "Invalid subh len in subh generation loop in generate_result_table()");
+	
+	printf("slice loop count: %d\n", subh_count);
+
 	for (size_t i=0; i < subh_count; i++) {	
-		assert(ARRAY_SIZE(subh) != subh_count 
-			&& "Invalid subh len in subh generation loop in generate_result_table()");
-		
+
+
 		subh_rows[i]= slice(max_subh_rounded, subh[i]);
 
 		assert(subh_rows[i].array_len   && subh_rows[i].array_len   != 0 
