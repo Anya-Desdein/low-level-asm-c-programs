@@ -21,6 +21,8 @@
 #define TEXT_MAX_SIZE (1 << 9)
 #define MALLOC_SIZE   (1 << 13)
 
+size_t clock_frequency = 0;
+
 int main() {
 
 	// PURPOSE OF THIS SECTION: Pin this process to only one core in order to measure performance
@@ -75,8 +77,17 @@ int main() {
 		return 1;
 	}
 
-	if (cpustat.has_invariant_tsc == 0) {
-		printf("No invariant TSC, unused for now\n");
+	if (cpustat.has_invariant_tsc != 0) {
+		printf("Invariant TSC available\n");
+		if (cpustat.clock_rate != 0) {
+			clock_frequency = cpustat.clock_rate;
+			printf("Clock frequency: %zu\n", clock_frequency);
+		} else {
+			printf("Clock frequency equal 0\n");
+		}
+		
+	} else {	
+		printf("Invariant TSC unavailable\n");
 	} 
 
 	if (sched_setaffinity(pid, cpuset_size, &cpu_set) == -1) {
