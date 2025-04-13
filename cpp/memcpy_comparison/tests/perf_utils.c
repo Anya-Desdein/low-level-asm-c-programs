@@ -49,7 +49,7 @@ void cpuid(void) {
 // This evolved over time into a function that checks both rdtsc and invariant_tsc
 Cpustat cpuid_gcc(void) {
 
-	Cpustat retvals = {0,0,0};
+	Cpustat retvals = {0,0,0,0};
 	
 	uint32_t eax=0, ebx=0, ecx=0, edx=0;
 	__cpuid(0x80000000, eax, ebx, ecx, edx);
@@ -76,6 +76,21 @@ Cpustat cpuid_gcc(void) {
 	retvals.has_invariant_tsc = edx & (1 << 8); 
 	
 	printf("Has invariant tsc: %" PRIu32 "\n", retvals.has_invariant_tsc);
+		
+	if (retvals.has_invariant_tsc == 0) 
+		return retvals;
+	
+	eax = 0, ebx = 0, ecx = 0, edx = 0;
+	__cpuid(0x00000015, eax, ebx, ecx, edx);
+
+	printf("Subvalues of leaf 0x15: ");
+	printf("eax %d, ebx %d, ecx %d\n", eax, ebx, ecx);
+	if (eax == 0 || ebx == 0 || ecx == 0)
+		return retvals;
+
+	retvals.clock_rate = ecx * (ebx/eax); 
+	
+	printf("Clock rate: %zu\n", retvals.clock_rate);
 
 	return retvals;
 }
