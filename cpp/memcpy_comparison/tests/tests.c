@@ -742,7 +742,6 @@ int main(void) {
 			clock_rate = cpuid_ret.clock_rate;
 			printf("Clock rate: %zu, counting time in ns\n", clock_rate);
 		} else {
-			clock_rate = 1e3;
 			printf("No Clock frequency (leaf 0x15), counting time in clock cycles\n");
 		}
 	} else {
