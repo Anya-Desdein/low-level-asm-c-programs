@@ -12,7 +12,7 @@ void *cmemcpy2(
 	/* Copy 64 bit chunks */
 	long long int * dst_u64 = (long long int *)dest_;
 	long long int * src_u64 = (long long int *)src_;
-	for (int i = 0; i < numberofints; i++) {
+	for (size_t i = 0; i < numberofints; i++) {
 		*dst_u64 = *src_u64;
 		++dst_u64;
 		++src_u64;
