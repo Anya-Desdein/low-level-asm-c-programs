@@ -605,7 +605,7 @@ void generate_result_table() {
 	char subh_align[] = "left";
 	char *subh[] = {
 		"TIME      (CYCLES):",
-		"TIME      (TIME):",
+		"TIME      (NS):",
 		"SIZE:",
 		"MEMCPY:",
 		"TEST:"
@@ -680,8 +680,7 @@ void generate_result_table() {
 		sprintf(diff,    "%zu", res->difftime);
 		sprintf(size,    "%zu", res->size);
 		if (clock_rate != 0) // Remove diff_time column hack
-			sprintf(diff_sc, "%zu", clock_rate * res->difftime);
-
+			sprintf(diff_sc, "%zu", res->difftime * 1000000000 / clock_rate);
 
 		char disp_align[] = "left";
 		print_column_el(column_len, diff,    disp_align, &hsv);
