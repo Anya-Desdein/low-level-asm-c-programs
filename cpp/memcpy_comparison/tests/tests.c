@@ -115,6 +115,16 @@ struct {
 	Result	arr[FULL_TEST_COUNT];
 } results;
 
+void *aligned_malloc(size_t size, size_t alignment) {
+
+	void *ptr = NULL;
+	int   res = posix_memalign(&ptr, alignment, size);
+
+	assert(res == 0 && "Posix_memalign failed in aligned_malloc()");
+
+	return ptr;
+}
+
 size_t align_to(size_t el, size_t alignment) {
 
 	/* This works better for larger numbers
@@ -246,25 +256,39 @@ size_t measure_time(
 		return difftime;
 }
 
-void test_memcpy_set(){
+void test_memcpy_set(int align){
+	
+	assert( align == 64 || align == 8
+		&& "Incorrect align value in test_memcpy_set()");		
 	
 	size_t  marr = ARRAY_SIZE(tested_memcpy.arr),
 		tarr = ARRAY_SIZE(entries.arr),
 		rarr = ARRAY_SIZE(results.arr);
 	
-	assert(marr == MEMCPY_COUNT    && "tested_memcpy.arr of incorrect size");
-	assert(tarr == TEST_COUNT      && "entries.arr of incorrect size");
-	assert(rarr == FULL_TEST_COUNT && "results.arr of incorrect size");
+	assert(marr == MEMCPY_COUNT    && "tested_memcpy.arr of incorrect size in test_memcpy_set()");
+	assert(tarr == TEST_COUNT      && "entries.arr of incorrect size in test_memcpy_set()");
+	assert(rarr == FULL_TEST_COUNT && "results.arr of incorrect size in test_memcpy_set()");
 		
-	int   idx 	 = 0;
-	char *src_txt    = (char *)malloc(TEXT_MAX_SIZE);
-	char *dst_txt 	 = (char *)malloc(TEXT_MAX_SIZE);
+	int idx=0, unalignment=0;
+	if (align == 8)
+		unalignment = 71; // making sure that the value is not divisible by 64
+
+	char *src_txt = (char *)aligned_malloc(TEXT_MAX_SIZE + unalignment, align);
+	char *dst_txt = (char *)aligned_malloc(TEXT_MAX_SIZE + unalignment, align);
+	
+	if (align == 8) {
+		src_txt = src_txt + unalignment;
+		dst_txt = dst_txt + unalignment;
+	}
+
+	assert(src_txt  && "Src_txt malloc failed in test_memcpy_set()");
+	assert(dst_txt  && "Dst_txt malloc failed in test_memcpy_set()");
 
 	for (unsigned int i=0; i < marr; i++) {
 		for (unsigned int j=0; j < tarr; j++) {
 		
 			assert((uint32_t)idx <= rarr 
-				&& "Overflowing results.arr index in test_memcpy_set");
+				&& "Overflowing results.arr index in test_memcpy_set()");
 	
 			Entry  *ent = &entries.arr[j];
 			Result *res = &results.arr[idx];
@@ -272,7 +296,7 @@ void test_memcpy_set(){
 			res->size = ent->size * ent->reps;
 			if (res->size > TEXT_MAX_SIZE) {
 			
-				printf("Overflowing results.arr.size\n");
+				printf("Overflowing results.arr.size in test_memcpy_set()\n");
 				
 				printf("res->size: %zu, TEXT_MAX_SIZE: %d\n",
 				res->size,
@@ -380,7 +404,7 @@ void print_column_el(size_t column_len, char *str, char *align, HSV *hsv) {
 	assert(str	  && "Missing str in print_column_el()");	
 	assert(align	  && "Missing align in print_column_el()");	
 
-	assert(( strcmp(align, "center") == 0 || strcmp(align, "left") == 0)
+	assert( strcmp(align, "center") == 0 || strcmp(align, "left") == 0
 		&& "Incorrect align value in print_column_el()");		
 	
 	size_t padding_size  = (column_len - strlen(str));
@@ -518,8 +542,10 @@ size_t count_digits(size_t num) {
 	return sl;
 }
 
-void generate_result_table() {
+void generate_result_table(char *title) {
 
+	assert( title && "Incorrect title value in generate_result_table()");		
+	
 	size_t table_len  = 0, column_len = 0;
 	struct {
 		size_t memcpy;	
@@ -529,7 +555,7 @@ void generate_result_table() {
 		size_t diff_time;
 	} max = {0};	
 
-	assert( sizeof(max) == sizeof(size_t) * 5 
+	assert( sizeof(max)  == sizeof(size_t) * 5 
 		&& "Incorrect size of struct max in generate_result_table()");
 	
 	size_t  column_count  = sizeof(max)/ sizeof(size_t),
@@ -593,7 +619,7 @@ void generate_result_table() {
 		sizeof(results.arr[0]),	
 		&type_comp);	
 
-	const char header[]       = "RESULTS";
+	const char header[]       = "UNALIGNED RESULTS";
 	const char header_align[] = "center";
 	
 	// h.max = 360, s.max = 100, v.max = 100
@@ -885,10 +911,15 @@ int main(void) {
 	}
 
 	// Base structs generated, proceeding to test memcpy set 
-	test_memcpy_set();
+	test_memcpy_set(8); // Correct alignments are 8 and 64
 	
 	// Print results
-	generate_result_table();
+	generate_result_table("Unaligned");
+
+	test_memcpy_set(64); // run all the tests again with aligned data
+	
+	puts("");
+	generate_result_table("Aligned"); 
 
 	return 0;
 }
