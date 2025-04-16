@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <math.h>
 
 #include <stdint.h>
@@ -45,7 +46,7 @@
 #define __same_type(a,b) __builtin_types_compatible_p(typeof(a), typeof(b))
 
 #define ARRAY_SIZE(arr) \
-	(BUILD_BUG_ON_ZERO( \
+	((void)BUILD_BUG_ON_ZERO( \
 		__same_type((arr), &(arr)[0])), \
 		(sizeof(arr) / sizeof((arr)[0])) \
 	)
@@ -258,7 +259,7 @@ size_t measure_time(
 
 void test_memcpy_set(int align){
 	
-	assert( align == 64 || align == 8
+	assert( (align == 64 || align == 8)
 		&& "Incorrect align value in test_memcpy_set()");		
 	
 	size_t  marr = ARRAY_SIZE(tested_memcpy.arr),
@@ -268,7 +269,7 @@ void test_memcpy_set(int align){
 	assert(marr == MEMCPY_COUNT    && "tested_memcpy.arr of incorrect size in test_memcpy_set()");
 	assert(tarr == TEST_COUNT      && "entries.arr of incorrect size in test_memcpy_set()");
 	assert(rarr == FULL_TEST_COUNT && "results.arr of incorrect size in test_memcpy_set()");
-		
+
 	int idx=0, unalignment=0;
 	if (align == 8)
 		unalignment = 71; // making sure that the value is not divisible by 64
@@ -281,8 +282,8 @@ void test_memcpy_set(int align){
 		dst_txt = dst_txt + unalignment;
 	}
 
-	assert(src_txt  && "Src_txt malloc failed in test_memcpy_set()");
-	assert(dst_txt  && "Dst_txt malloc failed in test_memcpy_set()");
+	assert(src_txt && "Src_txt malloc failed in test_memcpy_set()");
+	assert(dst_txt && "Dst_txt malloc failed in test_memcpy_set()");
 
 	for (unsigned int i=0; i < marr; i++) {
 		for (unsigned int j=0; j < tarr; j++) {
@@ -404,7 +405,7 @@ void print_column_el(size_t column_len, char *str, char *align, HSV *hsv) {
 	assert(str	  && "Missing str in print_column_el()");	
 	assert(align	  && "Missing align in print_column_el()");	
 
-	assert( strcmp(align, "center") == 0 || strcmp(align, "left") == 0
+	assert((strcmp(align, "center") == 0 || strcmp(align, "left") == 0)
 		&& "Incorrect align value in print_column_el()");		
 	
 	size_t padding_size  = (column_len - strlen(str));
@@ -542,9 +543,9 @@ size_t count_digits(size_t num) {
 	return sl;
 }
 
-void generate_result_table(char *title) {
+void generate_result_table(const char *title__) {
 
-	assert( title && "Incorrect title value in generate_result_table()");		
+	assert( title__ && "Incorrect title__ value in generate_result_table()");		
 	
 	size_t table_len  = 0, column_len = 0;
 	struct {
@@ -575,21 +576,21 @@ void generate_result_table(char *title) {
 		assert(res->difftime	&& "Res->difftime missing in generate_result_table()");
 		assert(res->size	&& "Res->size missing in generate_result_table()");
 
-		size_t  test__ =  strlen(res->test_name);
-		size_t  mmcp__ =  strlen(res->memcpy_name);
+		size_t  test__ = strlen(res->test_name);
+		size_t  mmcp__ = strlen(res->memcpy_name);
 
 		if (res->difftime > max.diff)
-			max.diff     = res->difftime;
+			max.diff  = res->difftime;
 		if (res->size	  > max.size) 
-			max.size     = res->size;
+			max.size  = res->size;
 		if (test__ 	  > max.test)
-			max.test     = test__;
+			max.test  = test__;
 		if (mmcp__ 	  > max.memcpy)
-			max.memcpy   = mmcp__;
+			max.memcpy = mmcp__;
 	}
 
-	max.size      = count_digits(max.size);
-	max.diff      = count_digits(max.diff);
+	max.size = count_digits(max.size);
+	max.diff = count_digits(max.diff);
 
 	if (clock_rate != 0) // Remove diff_time column hack
 		max.diff_time = count_digits(clock_rate) + max.diff;
@@ -619,7 +620,15 @@ void generate_result_table(char *title) {
 		sizeof(results.arr[0]),	
 		&type_comp);	
 
-	const char header[]       = "UNALIGNED RESULTS";
+	char title[TITLE_MAX_SIZE], header[TITLE_MAX_SIZE];
+	
+	size_t i=0;
+	for (; i < strlen(title__); i++) {
+		title[i] = toupper(title__[i]);		
+	} title[i] = '\0';
+
+	sprintf(header, "%s RESULTS", title);
+
 	const char header_align[] = "center";
 	
 	// h.max = 360, s.max = 100, v.max = 100
