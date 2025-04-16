@@ -28,7 +28,7 @@ Without the first argument it would be
 Which, on the other hand, is incorrect syntax and wouldn't work.
 */
 #define ARRAY_SIZE(arr) \
-	(BUILD_BUG_ON_ZERO(\
+	((void)BUILD_BUG_ON_ZERO(\
 		__same_type((arr), &(arr)[0])), \
 		(sizeof(arr) / sizeof((arr)[0])) \
 	)

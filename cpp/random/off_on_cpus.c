@@ -10,7 +10,7 @@
 
 #include <linux/limits.h>
 
-int pleaseleave() {	
+int pleaseleave(void) {	
 	printf("Usage:\n\toocpu list,\n\toocpu on CPU_NUM,\n\toocpu off CPU_NUM\n");
 	return 1;
 }

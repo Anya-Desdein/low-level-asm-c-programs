@@ -13,7 +13,7 @@
 #include <inttypes.h>
 
 
-int main() {
+int main(void) {
 	
 	printf("CPU_SETSIZE:\n\ta constant,\n\tmaximum number\n\tof CPUs per CPU_SET\n");
 	printf("Current CPU_SETSIZE:\n\t%d bytes\n", (CPU_SETSIZE/8));

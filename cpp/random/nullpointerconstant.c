@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-int main() {
+int main(void) {
 	int *a = (int *)0; // null pointer
 	int *b = NULL; // null pointer
 	int *c = 0; // null pointer
@@ -25,8 +25,6 @@ int main() {
 	printf("d: %s\n", (d == normalpt) ? "true" : "false");
 	printf("e: %s\n", (e == normalpt) ? "true" : "false");
 	// these will be false
-
-
 
 	printf("Compare null pointers: \n");
 	printf("%s\n", (a == b) ? "true" : "false");

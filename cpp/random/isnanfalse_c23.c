@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdbool.h>
 
-int main() {
+int main(void) {
 	double a = NAN;
 	int *b = NULL;
 	int c = 0;

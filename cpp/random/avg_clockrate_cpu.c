@@ -6,7 +6,7 @@
 #include <time.h>
 
 // Get avg clockrate
-static double getavgclockrate() {
+static double getavgclockrate(void) {
 
 	double clockrate[66];
 	FILE *fp = fopen("/proc/cpuinfo", "r");
@@ -46,7 +46,7 @@ static double getavgclockrate() {
 }
 
 
-int main() {
+int main(void) {
 
 	double avgclock = getavgclockrate();	
 	printf("Averaged clockrate: %f\n", avgclock);

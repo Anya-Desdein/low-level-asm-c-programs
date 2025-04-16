@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-void stack_alloc() {
+void stack_alloc(void) {
 	int stack_array[10];
 	for (int i = 0; i < 1; i++) {
 		stack_array[i] = i;
@@ -37,7 +37,7 @@ int *heap_calloc(int i) {
 }
 
 
-int main() {
+int main(void) {
 	double a = 25.0;	
 	double b = sqrt(a);
 

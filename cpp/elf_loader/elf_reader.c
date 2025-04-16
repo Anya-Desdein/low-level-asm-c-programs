@@ -21,7 +21,7 @@ static void clfl(int *file_descr) {
 	close(*file_descr);
 }
 
-static void is_pie() {
+static void is_pie(void) {
 	// TODO: find how to differentiate PIE from shared object
 	IS_PIE = 1;
 }

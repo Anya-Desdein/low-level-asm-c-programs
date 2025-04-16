@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main(){
+int main(void){
 	FILE *file = fopen("./lines", "r");
 	if (file == NULL) {
 		perror("Failed to open your fucking file");

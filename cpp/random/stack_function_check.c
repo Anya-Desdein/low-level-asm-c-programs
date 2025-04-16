@@ -11,7 +11,7 @@ int add2(int a, int b, int c, int d) {
 	return a + b + c + d;
 }
 
-int main() {
+int main(void) {
 	int dupa = 0;
 	add(2,4);
 	add2(2,4,3,1);

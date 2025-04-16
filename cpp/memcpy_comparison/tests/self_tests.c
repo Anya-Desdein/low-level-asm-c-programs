@@ -23,7 +23,7 @@
 
 size_t clock_frequency = 0;
 
-int main() {
+int main(void) {
 
 	// PURPOSE OF THIS SECTION: Pin this process to only one core in order to measure performance
 

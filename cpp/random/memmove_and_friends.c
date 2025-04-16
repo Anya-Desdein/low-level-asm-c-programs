@@ -7,7 +7,7 @@ int mult(int x, int y) {
 	return x * y;
 }
 
-int counter() {
+int counter(void) {
 	static int count = 0;
 	count++;
 	printf("%d\n", count);
@@ -39,7 +39,7 @@ int print_str(int str, int size) {
 	return 0;
 }
 
-int main() {
+int main(void) {
 
 	int (*ptr1)(int, int);
 	ptr1 = &mult;
