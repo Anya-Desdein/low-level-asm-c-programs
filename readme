@@ -5,16 +5,14 @@ This repository contains various low-level assembly and C programs organized int
 ## Directory Structure
 low_level_asm_c_programs/
 ├── cpp/
-│   ├── memcpy_comparison/
-│   │   └── (custom implementations of memcpy and performance measurement)
 │   ├── elf_loader/
 │   │   └── (ELF loaders & readers)
 │   ├── makefile/
-│   │   └── (projects testing GNU Make)
+│   │   └── (learn GNU Make)
 │   ├── preprocessor/
 │   │   └── (preprocessor macros like VA_OPT and VA_ARGS)
 │   └── random/
-│       └── (other miscellaneous programs)
+│       └── (miscellaneous programs, turn off CPUs, calculate average clockrate, learn the basics etc.)
 └── asm/
     └── cpuidleaf (CPUID leaf reader)
     └── line reader (command-line line reader)
