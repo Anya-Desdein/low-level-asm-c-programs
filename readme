@@ -1,6 +1,6 @@
 # Low Level ASM C Programs
 
-This repository contains various low-level assembly and C programs organized into two main directories: `cpp` and `nasm`. Below is an overview of the folder structure and the purpose of each directory.
+This repository contains various low-level assembly and C programs organized into two main directories: `cpp` and `asm`. Below is an overview of the folder structure and the purpose of each directory.
 
 ## Directory Structure
 low_level_asm_c_programs/
