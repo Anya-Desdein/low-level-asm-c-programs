@@ -90,9 +90,12 @@ int main(void) {
 		perror("fork failed");
 		exit(1);
 	}
-	
 
 	if (baby_pid == 0) {
+
+		close(pipefd[0]);
+		dup2(pipefd[1], STDOUT_FILENO);
+
 		char *pathname = "./data_continous_stream";
 		char *argv[] = {pathname, "12", NULL};
 		int exec = execve(pathname, argv, NULL);
@@ -100,6 +103,10 @@ int main(void) {
 			perror("execve");
 			exit(1);
 		}
+	}
+
+	if (baby_pid > 0) {
+		close(pipefd[1]);
 	}
 	waitpid(baby_pid, &baby_ret, 0);
 
