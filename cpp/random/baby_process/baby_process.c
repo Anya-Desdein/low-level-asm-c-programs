@@ -76,10 +76,32 @@ int main(void) {
 	// Write to a pipe instead of stdout 
 	// and use child's output
 	int pipefd[2];
-	if (pipe2(pipefd, O_CLOEXEC) == -1) {
+	if (pipe2(pipefd, 0) == -1) {
 		perror("pipe2");
 		exit(1);
 	}
+
+	int baby_ret;
+
+	setvbuf(stdout, NULL, _IONBF, 0);
+	
+	pid_t baby_pid = fork();
+	if (baby_pid == -1) {
+		perror("fork failed");
+		exit(1);
+	}
+	
+
+	if (baby_pid == 0) {
+		char *pathname = "./data_continous_stream";
+		char *argv[] = {pathname, "12", NULL};
+		int exec = execve(pathname, argv, NULL);
+		if (exec == -1) {
+			perror("execve");
+			exit(1);
+		}
+	}
+	waitpid(baby_pid, &baby_ret, 0);
 
 	return 0;
 }
