@@ -84,8 +84,9 @@ int main(void) {
 	int baby_ret;
 
 	setvbuf(stdout, NULL, _IONBF, 0);
-	
+
 	pid_t baby_pid = fork();
+
 	if (baby_pid == -1) {
 		perror("fork failed");
 		exit(1);
@@ -97,7 +98,8 @@ int main(void) {
 		dup2(pipefd[1], STDOUT_FILENO);
 
 		char *pathname = "./data_continous_stream";
-		char *argv[] = {pathname, "12", NULL};
+		char *argv[] = {pathname, "unbuffered", "12", NULL};
+		
 		int exec = execve(pathname, argv, NULL);
 		if (exec == -1) {
 			perror("execve");
@@ -107,6 +109,22 @@ int main(void) {
 
 	if (baby_pid > 0) {
 		close(pipefd[1]);
+
+		int bufsize = 256;
+		char buf[bufsize];
+		ssize_t rsize;
+
+		int line = 0;
+
+		while ((rsize = read(pipefd[0], buf, bufsize-1)) > 0) {
+			if (rsize == -1) {
+				perror("read from pipe");
+			}	
+			buf[rsize] = '\0';
+
+			printf("%d: %s", line, buf);
+			line++;
+		}
 	}
 	waitpid(baby_pid, &baby_ret, 0);
 
