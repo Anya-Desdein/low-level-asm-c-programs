@@ -64,17 +64,10 @@ void execute_new_baby(void) {
 	waitpid(baby_pid, &baby_ret, 0);
 }
 
-int main(void) {
-	
-	// Spawn a child and race with it
-	// Write to console
-	race_condition();
+#define MODE_BUFFERED "buffered"
+#define MODE_UNBUFFERED "unbuffered"
 
-	// Execve to another process from the child
-	execute_new_baby();
-
-	// Write to a pipe instead of stdout 
-	// and use child's output
+void use_pipe(char *mode, int stream_count_) {
 	int pipefd[2];
 	if (pipe2(pipefd, 0) == -1) {
 		perror("pipe2");
@@ -82,11 +75,20 @@ int main(void) {
 	}
 
 	int baby_ret;
+	
+	if (mode != MODE_BUFFERED && 
+	    mode !=  MODE_UNBUFFERED) {
+		perror("use_pipe");
+		exit(1);
+	    }
+	printf("------Using %s data------\n", mode);
+
+	char stream_count[16];
+	snprintf(stream_count, sizeof(stream_count), "%d", stream_count_);
 
 	setvbuf(stdout, NULL, _IONBF, 0);
-
+	
 	pid_t baby_pid = fork();
-
 	if (baby_pid == -1) {
 		perror("fork failed");
 		exit(1);
@@ -98,7 +100,13 @@ int main(void) {
 		dup2(pipefd[1], STDOUT_FILENO);
 
 		char *pathname = "./data_continous_stream";
-		char *argv[] = {pathname, "unbuffered", "12", NULL};
+		char *argv[] = {
+			pathname, 
+			(mode == MODE_BUFFERED)
+			? "buffered"
+			: "unbuffered", 
+			stream_count, 
+			NULL};
 		
 		int exec = execve(pathname, argv, NULL);
 		if (exec == -1) {
@@ -127,6 +135,21 @@ int main(void) {
 		}
 	}
 	waitpid(baby_pid, &baby_ret, 0);
+}
+
+int main(void) {
+	
+	// Spawn a child and race with it
+	// Write to console
+	race_condition();
+
+	// Execve to another process from the child
+	execute_new_baby();
+
+	// Write to a pipe instead of stdout 
+	// and use child's output
+	use_pipe(MODE_UNBUFFERED, 4);
+	use_pipe(MODE_BUFFERED, 2);
 
 	return 0;
 }

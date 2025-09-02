@@ -49,11 +49,25 @@ int main(int argc, char *argv[]) {
 	
 	int bufsize = 256;
 	char buf[bufsize];
-	for (int i=-1; i < count; i++) {
-		int size = snprintf(buf, bufsize, "data stream number %d\n", 1+i);
-		// descriptor 1 is stdout
-		// macro => STDOUT_FILENO
-		write(1, buf, size+1);
+	for (int i=0; i < count; i++) {
+		if (mode == MODE_UNBUFFERED) {
+			int size = snprintf(
+				buf, 
+				bufsize, 
+				"data stream number %d\n",
+				1+i);
+
+			// descriptor 1 is stdout
+			// macro => STDOUT_FILENO
+			write(STDOUT_FILENO, buf, size+1);
+		}
+
+		if (mode == MODE_BUFFERED) {
+			printf(
+				"data stream number %d\n",
+				1+i);
+		}	
+		
 		nanosleep(&time, NULL);
 	}
 	return 0;
