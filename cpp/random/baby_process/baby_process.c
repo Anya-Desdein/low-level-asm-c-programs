@@ -149,7 +149,7 @@ void spawn_bin() {
 	pid_t baby_pid = fork();
 
 	if (baby_pid == -1) {
-		perror("fork failed");
+		perror("fork");
 		exit(1);
 	}
 
