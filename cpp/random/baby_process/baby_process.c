@@ -137,6 +137,33 @@ void use_pipe(char *mode, int stream_count_) {
 	waitpid(baby_pid, &baby_ret, 0);
 }
 
+void spawn_bin() {
+	int baby_ret;
+
+	char *argv[] = {
+		"ls",
+		"-l",
+		NULL
+	};
+	
+	pid_t baby_pid = fork();
+
+	if (baby_pid == -1) {
+		perror("fork failed");
+		exit(1);
+	}
+
+	if (baby_pid == 0) {
+		int exec = execve("/bin/ls", argv, NULL);
+		if (exec == -1) {
+				perror("execve");
+				exit(1);
+		}
+	}
+	waitpid(baby_pid, &baby_ret, 0);
+}
+
+
 int main(void) {
 	
 	// Spawn a child and race with it
@@ -150,18 +177,9 @@ int main(void) {
 	// and use child's output
 	use_pipe(MODE_UNBUFFERED, 4);
 	use_pipe(MODE_BUFFERED, 2);
-
-	char *argv[] = {
-		"ls",
-		"-l",
-		NULL
-	};
 	
-	int exec = execve("/bin/ls", argv, NULL);
-	if (exec == -1) {
-			perror("execve");
-			exit(1);
-	}
+	// Spawn bin/ls -l
+	spawn_bin();
 
 	return 0;
 }
