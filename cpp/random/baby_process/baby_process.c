@@ -151,5 +151,17 @@ int main(void) {
 	use_pipe(MODE_UNBUFFERED, 4);
 	use_pipe(MODE_BUFFERED, 2);
 
+	char *argv[] = {
+		"ls",
+		"-l",
+		NULL
+	};
+	
+	int exec = execve("/bin/ls", argv, NULL);
+	if (exec == -1) {
+			perror("execve");
+			exit(1);
+	}
+
 	return 0;
 }
