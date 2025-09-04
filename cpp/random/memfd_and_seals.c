@@ -67,16 +67,43 @@ int main(void) {
 		printf(" SEAL_GROW");
 	}
 	if (seal_mask & F_SEAL_WRITE) {
-		printf("SEAL_WRITE");
+		printf(" SEAL_WRITE");
 	}
 	if (seal_mask & F_SEAL_FUTURE_WRITE) {
-		printf("SEAL_FUTURE_WRITE");
+		printf(" SEAL_FUTURE_WRITE");
 	}
 	printf("\n");
-
-
-
-
-
 	
+	int child_ret;
+	pid_t child_pid = fork();
+
+	if (child_pid == -1) {
+		perror("fork");
+		exit(1);
+	}
+
+	if (child_pid == 0) {
+		// This will fail due to SEAL_SHRINK
+		int trunc = ftruncate(fd, 1024 * 1024);
+		if (trunc != 0) {
+			perror("ftruncate");
+		}
+		
+		// Add a seal from child
+		if (fcntl(fd, 
+			F_ADD_SEALS, 
+			F_SEAL_SEAL) == -1) {
+			perror("fcntl(F_ADD_SEALS)");
+			return 1;
+		}
+
+		// This will fail, as F_SEAL_SEAL was added
+		if (fcntl(
+			fd, 
+			F_ADD_SEALS, 
+			F_SEAL_FUTURE_WRITE)
+			== -1) {
+			perror("fcntl(F_ADD_SEALS)");
+		}
+	}
 }	
