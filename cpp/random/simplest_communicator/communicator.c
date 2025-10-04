@@ -22,6 +22,47 @@
 	)
 
 #define MAX_EVENTS 64
+#define BUF_SIZE (4*1024)
+
+#ifdef __STDC_VERSION__
+	#if __STDC_VERSION__ >= 202311L
+		#define SOCK_STATIC_ASSERT(expr, msg) \
+			static_assert(expr, msg)
+	#elif __STDC_VERSION__ >= 201112L
+		#include <assert.h>
+		#define SOCK_STATIC_ASSERT(expr, msg) \
+			_Static_assert(expr, msg)
+	#else 
+		#error "Minimal supported version is C11"
+	#endif
+#endif
+
+static ssize_t
+sock_read(int fd, char *buf, ssize_t bufsize) {
+	//SOCK_STATIC_ASSERT(fd, "int fd missing in sock_read");
+	//SOCK_STATIC_ASSERT(buf, "char *buf missing in sock_read");
+	//SOCK_STATIC_ASSERT(bufsize<1, "ssize_t bufsize missing in sock_read");
+
+	ssize_t n = 0, filled = 0;
+	while (filled < bufsize) {
+		n = read(
+			fd, 
+			buf+filled,
+			bufsize - filled
+		);
+
+		if (n < 0) {
+			perror("read");
+			return -1;
+		}
+
+		if (n == 0)
+			return filled;
+
+		filled += n;
+	}
+	return filled;
+}
 
 int main(void) {
 
@@ -72,6 +113,10 @@ int main(void) {
 	
 	uint32_t new_ev;
 	int event_fd;
+	ssize_t read_err;
+
+	char read_res[BUF_SIZE];
+	memset(read_res, 0, sizeof(read_res));
 	for (;;) {
 		ready = epoll_wait(epollfd, events, MAX_EVENTS, -1);
 		if (ready == -1) {
@@ -79,24 +124,43 @@ int main(void) {
 			return 1;
 		}
 
-		for (int n=0; n<ready, n++) {
-			new_ev = evs[i].events;
-			event_fd = evs[i].data.fd;
+		for (int n=0; n<ready; n++) {
+			new_ev = events[n].events;
+			event_fd = events[n].data.fd;
+			
+			read_err = sock_read(event_fd, read_res, BUF_SIZE);
+			if (read_err == -1) {
+				epoll_ctl(
+					epollfd, 
+					EPOLL_CTL_DEL, 
+					event_fd,
+					0
+				);
+
+				close(event_fd);
+			}
+
+			if (read_err == 0) {
+				// No data to read, sth is wrong
+				printf("Uncaugh read error from the socket.");
+				epoll_ctl(
+					epollfd, 
+					EPOLL_CTL_DEL, 
+					event_fd,
+					0
+				);
+
+				close(event_fd);
+			};
 
 			if (new_ev & EPOLLERR) {
+				
 				// get error and close stuff
 			}
 
 			if (new_ev & EPOLLHUP) {
 				// hangup, close
 			}
-
-
-			
-
-
-
-
 		}
 	}
 	
