@@ -7,6 +7,8 @@
 #include <sys/un.h>
 #include <sys/select.h>
 
+#include <assert.h>
+
 #define SOCKET_PATH "/tmp/socket_test"
 #define CLIENT_MAX FD_SETSIZE
 #define CLIENT_QUEUE_MAX SOMAXCONN
@@ -39,9 +41,9 @@
 
 static ssize_t
 sock_read(int fd, char *buf, ssize_t bufsize) {
-	//SOCK_STATIC_ASSERT(fd, "int fd missing in sock_read");
-	//SOCK_STATIC_ASSERT(buf, "char *buf missing in sock_read");
-	//SOCK_STATIC_ASSERT(bufsize<1, "ssize_t bufsize missing in sock_read");
+	assert((fd >= 0) && "int fd missing in sock_read");
+	assert((buf != NULL) && "char *buf missing in sock_read");
+	assert((bufsize>1) && "ssize_t bufsize missing in sock_read");
 
 	ssize_t n = 0, filled = 0;
 	while (filled < bufsize) {
