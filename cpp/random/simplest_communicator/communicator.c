@@ -114,7 +114,7 @@ int main(void) {
 	}
 	
 	uint32_t new_ev;
-	int event_fd;
+	int event_fd, new_sock;
 	ssize_t read_err;
 
 	char read_res[BUF_SIZE];
@@ -130,6 +130,32 @@ int main(void) {
 			new_ev = events[n].events;
 			event_fd = events[n].data.fd;
 			
+			if (event_fd == fd) {
+				new_sock = accept(event_fd, NULL, NULL);
+				if (new_sock == -1) {
+					perror("accept");
+					close(new_sock);
+					continue;
+				}
+				
+				if (epoll_ctl(
+					epollfd,
+					EPOLL_CTL_ADD,
+					new_sock,
+					&ev)
+					== -1) {
+					perror("epoll_ctl_add");
+					close(new_sock);
+				}
+
+				if (new_ev & EPOLLERR) {
+					// should never happen
+					printf("LISTENING SOCK: epoll err\n");
+					return 1;
+				}
+				continue;	
+			}
+
 			read_err = sock_read(event_fd, read_res, BUF_SIZE);
 			if (read_err == -1) {
 				epoll_ctl(
@@ -144,7 +170,7 @@ int main(void) {
 
 			if (read_err == 0) {
 				// No data to read, sth is wrong
-				printf("Uncaugh read error from the socket.");
+				printf("SOCK: uncaught read error.\n");
 				epoll_ctl(
 					epollfd, 
 					EPOLL_CTL_DEL, 
@@ -153,15 +179,20 @@ int main(void) {
 				);
 
 				close(event_fd);
-			};
-
-			if (new_ev & EPOLLERR) {
-				
-				// get error and close stuff
 			}
 
-			if (new_ev & EPOLLHUP) {
-				// hangup, close
+			if (
+				(new_ev & EPOLLERR) 
+				|| (new_ev & EPOLLHUP)
+			) {
+				epoll_ctl(
+					epollfd, 
+					EPOLL_CTL_DEL, 
+					event_fd,
+					0
+				);
+
+				close(event_fd);
 			}
 		}
 	}
