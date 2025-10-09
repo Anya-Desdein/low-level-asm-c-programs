@@ -8,6 +8,8 @@
 #include <sys/select.h>
 
 #include <assert.h>
+#include <errno.h>
+#include <string.h>
 
 #define SOCKET_PATH "/tmp/socket_test"
 #define CLIENT_MAX FD_SETSIZE
@@ -41,28 +43,44 @@
 #endif
 
 static ssize_t
-sock_write(int fd, char *buf, ssize_t bufsize) {
-	assert((fd >= 0) && "int fd missing in sock_write");
-	assert((buf != NULL) && "char *buf missing in sock_write");
-	assert((bufsize>1) && "ssize_t bufsize missing in sock_write");
+sock_send(int fd, char *buf, ssize_t bufsize) {
+	assert((fd >= 0) && "int fd missing in sock_send");
+	assert((buf != NULL) && "char *buf missing in sock_send");
+	assert((bufsize>1) && "ssize_t bufsize missing in sock_send");
 
-	ssize_t n = 0, send = 0;
-	while (send < bufsize) {
-		n = write(
+	int e;
+	ssize_t n = 0, sent = 0;
+	while (sent < bufsize) {
+		n = send(
 			fd, 
-			buf+send,
-			bufsize - send
+			buf+sent,
+			bufsize - sent,
+			MSG_NOSIGNAL
 		);
 
 		if (n < 0) {
-			perror("write");
+			e = errno;	
+		
+			switch (e) {
+				case EINTR:
+					continue;
+				case EAGAIN:
+				#ifdef EWOULDBLOCK
+					case EWOULDBLOCK:
+				#endif
+					return -1;
+				
+
+			}
+
+			perror("send");
 			return -1;
 		}
 
 		if (n == 0)
 			return 0;
 
-		send += n;
+		sent += n;
 	}
 	return 0;
 }
@@ -238,7 +256,7 @@ int main(void) {
 				read_res
 			);
 
-			write_err = sock_write(
+			write_err = sock_send(
 				event_fd, 
 				return_msg, 
 				BUF_SIZE
