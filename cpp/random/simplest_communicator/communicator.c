@@ -25,6 +25,7 @@
 
 #define MAX_EVENTS 64
 #define BUF_SIZE (4*1024)
+#define RETURN_BUF_SIZE (2*(BUF_SIZE))
 
 #ifdef __STDC_VERSION__
 	#if __STDC_VERSION__ >= 202311L
@@ -38,6 +39,33 @@
 		#error "Minimal supported version is C11"
 	#endif
 #endif
+
+static ssize_t
+sock_write(int fd, char *buf, ssize_t bufsize) {
+	assert((fd >= 0) && "int fd missing in sock_write");
+	assert((buf != NULL) && "char *buf missing in sock_write");
+	assert((bufsize>1) && "ssize_t bufsize missing in sock_write");
+
+	ssize_t n = 0, send = 0;
+	while (send < bufsize) {
+		n = write(
+			fd, 
+			buf+send,
+			bufsize - send
+		);
+
+		if (n < 0) {
+			perror("write");
+			return -1;
+		}
+
+		if (n == 0)
+			return 0;
+
+		send += n;
+	}
+	return 0;
+}
 
 static ssize_t
 sock_read(int fd, char *buf, ssize_t bufsize) {
@@ -115,9 +143,9 @@ int main(void) {
 	
 	uint32_t new_ev;
 	int event_fd, new_sock;
-	ssize_t read_err;
+	ssize_t read_size, write_err;
 
-	char read_res[BUF_SIZE];
+	char read_res[BUF_SIZE], return_msg[RETURN_BUF_SIZE];
 	memset(read_res, 0, sizeof(read_res));
 	for (;;) {
 		ready = epoll_wait(epollfd, events, MAX_EVENTS, -1);
@@ -131,13 +159,13 @@ int main(void) {
 			event_fd = events[n].data.fd;
 			
 			if (event_fd == fd) {
-				new_sock = accept(event_fd, NULL, NULL);
+				new_sock = accept4(event_fd, NULL, SOCK_NONBLOCK);
 				if (new_sock == -1) {
 					perror("accept");
 					close(new_sock);
 					continue;
 				}
-				
+			
 				if (epoll_ctl(
 					epollfd,
 					EPOLL_CTL_ADD,
@@ -156,8 +184,8 @@ int main(void) {
 				continue;	
 			}
 
-			read_err = sock_read(event_fd, read_res, BUF_SIZE);
-			if (read_err == -1) {
+			read_size = sock_read(event_fd, read_res, BUF_SIZE);
+			if (read_size == -1) {
 				epoll_ctl(
 					epollfd, 
 					EPOLL_CTL_DEL, 
@@ -168,7 +196,7 @@ int main(void) {
 				close(event_fd);
 			}
 
-			if (read_err == 0) {
+			if (read_size == 0) {
 				// No data to read, sth is wrong
 				printf("SOCK: uncaught read error.\n");
 				epoll_ctl(
@@ -192,6 +220,36 @@ int main(void) {
 					0
 				);
 
+				close(event_fd);
+			}
+
+			memset(
+				return_msg, 
+				0, 
+				sizeof(return_msg)
+			);
+
+			snprintf(
+				return_msg, 
+				sizeof(return_msg),
+				"Socket %d on event %d said: %s",
+				event_fd, 
+				new_ev, 
+				read_res
+			);
+
+			write_err = sock_write(
+				event_fd, 
+				return_msg, 
+				BUF_SIZE
+			);
+			if (read_size == -1) {
+				epoll_ctl(
+					epollfd, 
+					EPOLL_CTL_DEL, 
+					event_fd,
+					0
+				);
 				close(event_fd);
 			}
 		}
