@@ -68,9 +68,22 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 				#ifdef EWOULDBLOCK
 					case EWOULDBLOCK:
 				#endif
-					return -1;
-				
-
+					printf("Unhandled EAGAIN\n");
+				case EBADF:
+				case EFAULT:
+				case EINVAL:
+				case ENOTSOCK:
+				case EOPNOTSUPP:
+					printf("Caller error\n");
+				case EPIPE:
+				case ECONNRESET:
+				case ENOTCONN:
+				case ETIMEDOUT:
+				case EIO:
+				case ENOBUFS:
+					printf("Peer error\n");
+				default:
+					printf("Unexpected error type\n");
 			}
 
 			perror("send");
