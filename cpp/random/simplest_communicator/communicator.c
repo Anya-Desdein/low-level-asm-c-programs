@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -60,21 +62,23 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 
 		if (n < 0) {
 			e = errno;	
-		
+	
 			switch (e) {
 				case EINTR:
 					continue;
 				case EAGAIN:
-				#ifdef EWOULDBLOCK
+				#if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
 					case EWOULDBLOCK:
 				#endif
 					printf("Unhandled EAGAIN\n");
+					break;
 				case EBADF:
 				case EFAULT:
 				case EINVAL:
 				case ENOTSOCK:
 				case EOPNOTSUPP:
 					printf("Caller error\n");
+					break;
 				case EPIPE:
 				case ECONNRESET:
 				case ENOTCONN:
@@ -82,8 +86,10 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 				case EIO:
 				case ENOBUFS:
 					printf("Peer error\n");
+					break;
 				default:
 					printf("Unexpected error type\n");
+					break;
 			}
 
 			perror("send");
@@ -104,6 +110,7 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 	assert((buf != NULL) && "char *buf missing in sock_read");
 	assert((bufsize>1) && "ssize_t bufsize missing in sock_read");
 
+	int e;
 	ssize_t n = 0, filled = 0;
 	while (filled < bufsize) {
 		n = read(
@@ -113,6 +120,10 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 		);
 
 		if (n < 0) {
+			e = errno;	
+			if (e == EINTR) 
+				continue;
+
 			perror("read");
 			return -1;
 		}
@@ -129,7 +140,7 @@ int main(void) {
 
 	int clients[CLIENT_MAX];
 
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (fd == -1) {
 		perror("socket");
 		return 1;
@@ -139,7 +150,7 @@ int main(void) {
 
 	struct sockaddr_un server_addr;
 
-	memset(&server_addr, 0,sizeof(server_addr));
+	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sun_family = AF_UNIX;
 	strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path));
 
@@ -174,7 +185,7 @@ int main(void) {
 	
 	uint32_t new_ev;
 	int event_fd, new_sock;
-	ssize_t read_size, write_err;
+	ssize_t read_size, send_err;
 
 	char read_res[BUF_SIZE], return_msg[RETURN_BUF_SIZE];
 	memset(read_res, 0, sizeof(read_res));
@@ -190,7 +201,7 @@ int main(void) {
 			event_fd = events[n].data.fd;
 			
 			if (event_fd == fd) {
-				new_sock = accept4(event_fd, NULL, SOCK_NONBLOCK);
+				new_sock = accept4(event_fd, NULL, NULL, SOCK_NONBLOCK);
 				if (new_sock == -1) {
 					perror("accept");
 					close(new_sock);
@@ -269,12 +280,12 @@ int main(void) {
 				read_res
 			);
 
-			write_err = sock_send(
+			send_err = sock_send(
 				event_fd, 
 				return_msg, 
 				BUF_SIZE
 			);
-			if (read_size == -1) {
+			if (send_err == -1) {
 				epoll_ctl(
 					epollfd, 
 					EPOLL_CTL_DEL, 
