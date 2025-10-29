@@ -3,7 +3,7 @@ SHELL = /bin/sh
 CC := gcc
 
 SRC = communicator
-CFLAGS = -Wall -Wextra -O3
+CFLAGS = -Wall -Wextra -O0 -g3 -ggdb
 
 
 all: build

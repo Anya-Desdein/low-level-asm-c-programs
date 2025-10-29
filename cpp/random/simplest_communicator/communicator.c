@@ -124,6 +124,16 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 			if (e == EINTR) 
 				continue;
 
+			if (e == EAGAIN) {
+				return filled;
+			}
+			
+			#if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
+				if (e == EWOULDBLOCK) {
+					return filled;
+				}
+			#endif
+
 			perror("read");
 			return -1;
 		}
@@ -199,6 +209,11 @@ int main(void) {
 		for (int n=0; n<ready; n++) {
 			new_ev = events[n].events;
 			event_fd = events[n].data.fd;
+
+			printf("EVENT: fd=%02x ev=%04x\n", event_fd, new_ev);
+
+			if (event_fd == 0 || new_ev == 0)
+				continue;
 			
 			if (event_fd == fd) {
 				new_sock = accept4(event_fd, NULL, NULL, SOCK_NONBLOCK);
@@ -208,6 +223,9 @@ int main(void) {
 					continue;
 				}
 			
+				memset(&ev, 0, sizeof(ev));
+				ev.events = EPOLLIN;
+				ev.data.fd = new_sock;
 				if (epoll_ctl(
 					epollfd,
 					EPOLL_CTL_ADD,
