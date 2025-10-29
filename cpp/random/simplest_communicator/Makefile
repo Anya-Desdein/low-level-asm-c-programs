@@ -2,7 +2,7 @@ SHELL = /bin/sh
 
 CC := gcc
 
-SRC = communicator
+SRC = sock_respond
 CFLAGS = -Wall -Wextra -O0 -g3 -ggdb
 
 
