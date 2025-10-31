@@ -244,6 +244,12 @@ int main(void) {
 				continue;	
 			}
 
+			memset(
+				read_res, 
+				0, 
+				sizeof(read_res)
+			);
+
 			read_size = sock_read(event_fd, read_res, BUF_SIZE);
 			if (read_size == -1) {
 				epoll_ctl(
