@@ -7,16 +7,17 @@
 #include <sys/epoll.h>
 
 #include <sys/un.h>
-#include <sys/select.h>
 
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
 
-#include <ulimit.h>
+#include <sys/resource.h>
 
 #define SOCKET_PORT "/tmp/socket_test"
 #define CLIENT_QUEUE_MAX SOMAXCONN
+
+#define CLIENT_MAX 1024
 
 #define BUILD_BUG_ON_ZERO(expr) ((int)(sizeof(struct {int:(-!!(expr)); })))
 
@@ -46,14 +47,15 @@
 #endif
 
 static int 
-remove_client(fd) {
-	for(int i=0; i < ARRAY_SIZE(clients); i++) {
+remove_client(int fd, int *clients, int client_size, int *client_count) {
+	for(int i=0; i < client_size; i++) {
 		if (clients[i] == -1)
 			continue;
 
 		if (clients[i] == fd) {
-			clients[i] == -1;
-			return 1;
+			clients[i] = -1;
+			client_count++; 
+			return 0;
 		}
 	}
 	
@@ -61,13 +63,14 @@ remove_client(fd) {
 }
 
 static int 
-add_client(fd) {
-	for(int i=0; i < ARRAY_SIZE(clients); i++) {
+add_client(int fd, int *clients, int client_size, int *client_count) {
+	for(int i=0; i < client_size; i++) {
 		if (clients[i] != -1)
 			continue;
 
-		clients[i] == fd;
-		return 1;
+		clients[i] = fd;
+		client_count--;
+		return 0;
 	}
 	
 	return -1;
@@ -177,9 +180,13 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 
 int main(void) {
 
-	
-
-	int clients[client_max];
+	// TODO: use it
+	struct rlimit limit;
+	if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
+		perror("getrlimit");
+	}
+		
+	int clients[CLIENT_MAX];
 	int client_count = 0;
 
 	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -202,7 +209,7 @@ int main(void) {
 		return 1;
 	}
 
-	if(listen(fd, client_max) == -1) {
+	if(listen(fd, CLIENT_MAX) == -1) {
 		printf("Connection queque limit reached.\nConnection refused.\n");
 	}
 
@@ -268,6 +275,15 @@ int main(void) {
 					close(new_sock);
 				}
 
+				if (add_client(
+					new_sock, 
+					clients, 
+					ARRAY_SIZE(clients),
+					&client_count
+					) != 0) {
+					printf("Add_client: failed to add a new client\n");	
+				}
+
 				if (new_ev & EPOLLERR) {
 					// should never happen
 					printf("LISTENING SOCK: epoll err\n");
@@ -331,17 +347,19 @@ int main(void) {
 				return_msg, 
 				sizeof(return_msg),
 				"%d: %s",
-				new_ev, 
+				event_fd, 
 				read_res
 			);
 		
 			for(size_t i=0; i<(ARRAY_SIZE(clients)); i++) {
 				if (clients[i] == -1)
 					continue;
-				
+
+				if (clients[i] == event_fd)
+					continue;
 
 				send_err = sock_send(
-					clients[i].fd, 
+					clients[i], 
 					return_msg, 
 					BUF_SIZE
 				);
@@ -349,9 +367,19 @@ int main(void) {
 					epoll_ctl(
 						epollfd, 
 						EPOLL_CTL_DEL, 
-						clients[i].fd,
+						clients[i],
 						0
 					);
+					if (remove_client(
+						clients[i], 
+						clients, 
+						ARRAY_SIZE(clients),
+						&client_count
+						) != 0) {
+						printf("Remove_client: client not removed\n");
+						return 1;
+					}
+					
 					close(event_fd);
 				}
 
