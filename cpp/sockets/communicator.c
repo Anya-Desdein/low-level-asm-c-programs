@@ -13,8 +13,9 @@
 #include <errno.h>
 #include <string.h>
 
-#define SOCKET_PATH "/tmp/socket_test"
-#define CLIENT_MAX FD_SETSIZE
+#include <ulimit.h>
+
+#define SOCKET_PORT "/tmp/socket_test"
 #define CLIENT_QUEUE_MAX SOMAXCONN
 
 #define BUILD_BUG_ON_ZERO(expr) ((int)(sizeof(struct {int:(-!!(expr)); })))
@@ -43,6 +44,34 @@
 		#error "Minimal supported version is C11"
 	#endif
 #endif
+
+static int 
+remove_client(fd) {
+	for(int i=0; i < ARRAY_SIZE(clients); i++) {
+		if (clients[i] == -1)
+			continue;
+
+		if (clients[i] == fd) {
+			clients[i] == -1;
+			return 1;
+		}
+	}
+	
+	return -1;
+}
+
+static int 
+add_client(fd) {
+	for(int i=0; i < ARRAY_SIZE(clients); i++) {
+		if (clients[i] != -1)
+			continue;
+
+		clients[i] == fd;
+		return 1;
+	}
+	
+	return -1;
+}
 
 static ssize_t
 sock_send(int fd, char *buf, ssize_t bufsize) {
@@ -148,7 +177,10 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 
 int main(void) {
 
-	int clients[CLIENT_MAX];
+	
+
+	int clients[client_max];
+	int client_count = 0;
 
 	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (fd == -1) {
@@ -156,13 +188,13 @@ int main(void) {
 		return 1;
 	}
 	printf("%d\n", fd);
-	unlink(SOCKET_PATH);
+	unlink(SOCKET_PORT);
 
 	struct sockaddr_un server_addr;
 
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sun_family = AF_UNIX;
-	strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path));
+	strncpy(server_addr.sun_path, SOCKET_PORT, sizeof(server_addr.sun_path));
 
 	if(bind(fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) ==  -1) {
 		perror("bind");
@@ -170,7 +202,7 @@ int main(void) {
 		return 1;
 	}
 
-	if(listen(fd, CLIENT_MAX) == -1) {
+	if(listen(fd, client_max) == -1) {
 		printf("Connection queque limit reached.\nConnection refused.\n");
 	}
 
@@ -244,6 +276,12 @@ int main(void) {
 				continue;	
 			}
 
+			memset(
+				read_res, 
+				0, 
+				sizeof(read_res)
+			);
+
 			read_size = sock_read(event_fd, read_res, BUF_SIZE);
 			if (read_size == -1) {
 				epoll_ctl(
@@ -292,26 +330,34 @@ int main(void) {
 			snprintf(
 				return_msg, 
 				sizeof(return_msg),
-				"Socket %d on event %d said: %s",
-				event_fd, 
+				"%d: %s",
 				new_ev, 
 				read_res
 			);
+		
+			for(size_t i=0; i<(ARRAY_SIZE(clients)); i++) {
+				if (clients[i] == -1)
+					continue;
+				
 
-			send_err = sock_send(
-				event_fd, 
-				return_msg, 
-				BUF_SIZE
-			);
-			if (send_err == -1) {
-				epoll_ctl(
-					epollfd, 
-					EPOLL_CTL_DEL, 
-					event_fd,
-					0
+				send_err = sock_send(
+					clients[i].fd, 
+					return_msg, 
+					BUF_SIZE
 				);
-				close(event_fd);
+				if (send_err == -1) {
+					epoll_ctl(
+						epollfd, 
+						EPOLL_CTL_DEL, 
+						clients[i].fd,
+						0
+					);
+					close(event_fd);
+				}
+
 			}
+
+			
 		}
 	}
 	
