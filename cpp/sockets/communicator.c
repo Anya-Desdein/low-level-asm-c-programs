@@ -370,6 +370,7 @@ int main(void) {
 						clients[i],
 						0
 					);
+					
 					if (remove_client(
 						clients[i], 
 						clients, 
@@ -379,13 +380,10 @@ int main(void) {
 						printf("Remove_client: client not removed\n");
 						return 1;
 					}
-					
+						
 					close(event_fd);
 				}
-
 			}
-
-			
 		}
 	}
 	

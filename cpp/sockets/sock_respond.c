@@ -44,6 +44,36 @@
 	#endif
 #endif
 
+static int 
+remove_client(int fd, int *clients, int client_size, int *client_count) {
+	for(int i=0; i < client_size; i++) {
+		if (clients[i] == -1)
+			continue;
+
+		if (clients[i] == fd) {
+			clients[i] = -1;
+			client_count++; 
+			return 0;
+		}
+	}
+	
+	return -1;
+}
+
+static int 
+add_client(int fd, int *clients, int client_size, int *client_count) {
+	for(int i=0; i < client_size; i++) {
+		if (clients[i] != -1)
+			continue;
+
+		clients[i] = fd;
+		client_count--;
+		return 0;
+	}
+	
+	return -1;
+}
+
 static ssize_t
 sock_send(int fd, char *buf, ssize_t bufsize) {
 	assert((fd >= 0) && "int fd missing in sock_send");
@@ -149,6 +179,7 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 int main(void) {
 
 	int clients[CLIENT_MAX];
+	int client_count = 0;
 
 	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (fd == -1) {
@@ -236,6 +267,15 @@ int main(void) {
 					close(new_sock);
 				}
 
+				if (add_client(
+					new_sock, 
+					clients, 
+					ARRAY_SIZE(clients),
+					&client_count
+					) != 0) {
+					printf("Add_client: failed to add a new client\n");	
+				}
+
 				if (new_ev & EPOLLERR) {
 					// should never happen
 					printf("LISTENING SOCK: epoll err\n");
@@ -316,6 +356,17 @@ int main(void) {
 					event_fd,
 					0
 				);
+
+				if (remove_client(
+					event_fd, 
+					clients, 
+					ARRAY_SIZE(clients),
+					&client_count
+					) != 0) {
+					printf("Remove_client: client not removed\n");
+					return 1;
+				}
+				
 				close(event_fd);
 			}
 		}
