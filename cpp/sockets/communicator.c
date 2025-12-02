@@ -136,6 +136,51 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 	return 0;
 }
 
+static int add_command(char *command, char arr[][512]) {
+	
+	int count = 0;
+
+	for(int i=0; i < 112; i++) {
+		if (arr[i][0] != '\0')
+			continue;
+
+		if (snprintf(arr[i], 512, "%s", command) < 1)
+			return -1;
+		
+		count = i+1;
+	}
+
+	return count;
+}
+
+
+static int
+process_commands(const char *msg, const int msg_size) {
+	if (msg_size < 1)
+		return 0;
+
+	char commands[112][512] = {'\0'};
+
+	int count = 0;
+	if ((count=add_command("/change_name", commands)) < 0) 
+		return 1;
+	if ((count=add_command("/name", commands)) 	  < 0)
+		return 1;
+	if ((count=add_command("/remove_name", commands)) < 0)
+		return 1;
+
+	printf("process commands now\n");
+
+	if (msg[0] == '/') {
+		for (int i=0; i < count; i++) {
+		 	// handle it someday
+			printf("added command\n");
+		}	
+	}
+
+	return 0;
+}
+
 static ssize_t
 sock_read(int fd, char *buf, ssize_t bufsize) {
 	assert((fd >= 0) && "int fd missing in sock_read");
@@ -335,6 +380,12 @@ int main(void) {
 				);
 
 				close(event_fd);
+			}
+			
+			// Check if the msg starts with /name, if yes, set the nickname for a person, each corresponding to each fd
+			if (process_commands(read_res, read_size) != 0) {
+				printf("Process_commands: command check error");
+				return 1;
 			}
 
 			memset(
