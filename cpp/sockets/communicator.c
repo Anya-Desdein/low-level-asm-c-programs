@@ -14,10 +14,13 @@
 
 #include <sys/resource.h>
 
+#include <ctype.h>
+
 #define SOCKET_PORT "/tmp/socket_test"
 #define CLIENT_QUEUE_MAX SOMAXCONN
 
-#define CLIENT_MAX 1024
+#define CLIENT_MAX 128
+#define CLIENT_MAX_ALIAS 512
 
 #define BUILD_BUG_ON_ZERO(expr) ((int)(sizeof(struct {int:(-!!(expr)); })))
 
@@ -45,6 +48,11 @@
 		#error "Minimal supported version is C11"
 	#endif
 #endif
+
+typedef struct {
+	int  clients[CLIENT_MAX];
+	char aliases[CLIENT_MAX][CLIENT_MAX_ALIAS];
+} Users;
 
 static int 
 remove_client(int fd, int *clients, int client_size, int *client_count) {
@@ -134,50 +142,97 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 		sent += n;
 	}
 	return 0;
-}
+}	
 
-static int add_command(char *command, char arr[][512]) {
-	
-	int count = 0;
+typedef int(*command_handler)(const char *msg, const int msg_size, Users *users, int user_id);
 
-	for(int i=0; i < 112; i++) {
-		if (arr[i][0] != '\0')
-			continue;
-
-		if (snprintf(arr[i], 512, "%s", command) < 1)
-			return -1;
-		
-		count = i+1;
+// TODO: printfs are send to users instead
+int change_name(const char *msg, const int msg_size, Users *users, int user_id) {
+	if (msg_size < 2 || isblank((int)msg[0]) == 0) {
+		printf("/change_name: missing name\n");
+		return 1;
 	}
 
-	return count;
-}
-
-
-static int
-process_commands(const char *msg, const int msg_size) {
-	if (msg_size < 1)
-		return 0;
-
-	char commands[112][512] = {'\0'};
-
-	int count = 0;
-	if ((count=add_command("/change_name", commands)) < 0) 
+	if ((msg_size-1) >= CLIENT_MAX_ALIAS) {
+		printf("/change_name: name too long\n");
 		return 1;
-	if ((count=add_command("/name", commands)) 	  < 0)
-		return 1;
-	if ((count=add_command("/remove_name", commands)) < 0)
-		return 1;
+	}
 
-	printf("process commands now\n");
-
-	if (msg[0] == '/') {
-		for (int i=0; i < count; i++) {
-		 	// handle it someday
-			printf("added command\n");
+	for (int i=1; i < msg_size; i++) {
+		int curr_char = (int)msg[i];
+		if (isalpha(curr_char) == 0 && isalnum(curr_char) == 0) {
+			printf("/change_name: name must consist of only letters and numbers\n");
+			return 1;
 		}	
 	}
 
+	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
+	int err = snprintf(users->aliases[user_id], msg_size-1, "%s", msg+1);  
+	if (err < 0) {
+		printf("/change_name: name change fail\n");
+		return 1;
+	}
+	
+	return 0;
+}
+
+// TODO: show the name to the user
+int show_name(const char *msg, const int msg_size, Users *users, int user_id) { 
+	char *alias = users->aliases[user_id];
+	
+	if (alias[0] == '\0') {
+		printf("/show_name: name not set\n");
+		return 1;
+	}
+	
+	printf("%s\n", alias);
+	return 0;
+}
+
+int remove_name(const char *msg, const int msg_size, Users *users, int user_id) {
+	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
+		
+	if(users->aliases[user_id][0] != '\0') {
+		printf("/change_name: name deletion fail\n");
+		return 1;
+	}
+	
+	return 0;
+}
+
+typedef struct {
+	char *name;
+	command_handler handler;
+} Command;
+
+Command commands[] = {
+	{ .name = "/change_name", .handler = change_name},
+	{ .name = "/show_name",   .handler = show_name},
+	{ .name = "/remove_name", .handler = remove_name},
+};
+
+static int
+maybe_process_command(const char *msg, const int msg_size, Users *users, int user_id) {
+	if (user_id < 0)
+		return 1;
+
+	if ((msg_size < 1) || (msg[0] == '\0'))
+		return 0;
+
+	for (int i=0; i<ARRAY_SIZE(commands); i++) {
+		const char *cmd_name = commands[i].name;
+		size_t name_len = strlen(cmd_name);
+
+		if (cmd_name[0] == '/' && msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
+			return commands[i].handler(
+				msg + name_len, 
+				msg_size - name_len, 
+				users, 
+				user_id
+			);
+		}	
+	}
+	
 	return 0;
 }
 
@@ -230,9 +285,9 @@ int main(void) {
 	if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
 		perror("getrlimit");
 	}
-		
-	int clients[CLIENT_MAX];
-	int client_count = 0;
+
+	Users users = {0};
+	int   client_count = 0;
 
 	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (fd == -1) {
@@ -258,8 +313,8 @@ int main(void) {
 		printf("Connection queque limit reached.\nConnection refused.\n");
 	}
 
-	for(size_t i=0; i<(ARRAY_SIZE(clients)); i++)
-		clients[i] = -1;
+	for(size_t i=0; i<(ARRAY_SIZE(users.clients)); i++)
+		users.clients[i] = -1;
 
 	struct epoll_event ev, events[MAX_EVENTS];
 	int ready, epollfd;
@@ -322,8 +377,8 @@ int main(void) {
 
 				if (add_client(
 					new_sock, 
-					clients, 
-					ARRAY_SIZE(clients),
+					users.clients, 
+					ARRAY_SIZE(users.clients),
 					&client_count
 					) != 0) {
 					printf("Add_client: failed to add a new client\n");	
@@ -380,10 +435,17 @@ int main(void) {
 				);
 
 				close(event_fd);
-			}
+			}			
 			
-			// Check if the msg starts with /name, if yes, set the nickname for a person, each corresponding to each fd
-			if (process_commands(read_res, read_size) != 0) {
+			int user_id = -1;
+			for(int i=0; i < CLIENT_MAX; i++) {
+				if (users.clients[i] != event_fd) 
+					continue;
+				
+				user_id = i;
+			}
+
+			if (maybe_process_command(read_res, read_size, &users, user_id) != 0) {
 				printf("Process_commands: command check error");
 				return 1;
 			}
@@ -402,15 +464,15 @@ int main(void) {
 				read_res
 			);
 		
-			for(size_t i=0; i<(ARRAY_SIZE(clients)); i++) {
-				if (clients[i] == -1)
+			for(size_t i=0; i<(ARRAY_SIZE(users.clients)); i++) {
+				if (users.clients[i] == -1)
 					continue;
 
-				if (clients[i] == event_fd)
+				if (users.clients[i] == event_fd)
 					continue;
 
 				send_err = sock_send(
-					clients[i], 
+					users.clients[i], 
 					return_msg, 
 					BUF_SIZE
 				);
@@ -418,14 +480,14 @@ int main(void) {
 					epoll_ctl(
 						epollfd, 
 						EPOLL_CTL_DEL, 
-						clients[i],
+						users.clients[i],
 						0
 					);
 					
 					if (remove_client(
-						clients[i], 
-						clients, 
-						ARRAY_SIZE(clients),
+						users.clients[i], 
+						users.clients, 
+						ARRAY_SIZE(users.clients),
 						&client_count
 						) != 0) {
 						printf("Remove_client: client not removed\n");
