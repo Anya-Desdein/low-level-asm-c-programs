@@ -167,8 +167,8 @@ int change_name(const char *msg, const ssize_t msg_size, Users *users, int user_
 	}
 
 	ssize_t msg_cp_size = msg_size_no_space;
-	if (msg_cp[msg_cp_size-2] == '\n') {
-		msg_cp[msg_cp_size-2] = '\0';
+	if (msg_cp[msg_cp_size-1] == '\n') {
+		msg_cp[msg_cp_size-1] = '\0';
 		msg_cp_size--;
 	}
 
@@ -237,9 +237,12 @@ Command commands[] = {
 	{ .name = "/remove_name", .handler = remove_name},
 };
 
+/*
+ * Returns whether the message should be further processed.
+ */
 static int
 maybe_process_command(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
-	if (user_id < 0)
+	if (user_id < 0 || user_id >= CLIENT_MAX)
 		return 1;
 
 	if ((msg_size < 1) || (msg[0] == '\0'))
