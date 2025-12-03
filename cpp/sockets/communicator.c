@@ -144,30 +144,50 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 	return 0;
 }	
 
-typedef int(*command_handler)(const char *msg, const int msg_size, Users *users, int user_id);
+typedef int(*command_handler)(const char *msg, const ssize_t msg_size, Users *users, int user_id);
 
 // TODO: printfs are send to users instead
-int change_name(const char *msg, const int msg_size, Users *users, int user_id) {
+int change_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	if (msg_size < 2 || isblank((int)msg[0]) == 0) {
-		printf("/change_name: missing name\n");
+		printf("/change_name: missing name or incorrect formatting\n");
 		return 1;
 	}
-
-	if ((msg_size-1) >= CLIENT_MAX_ALIAS) {
+	
+	const ssize_t msg_size_no_space = msg_size-1;
+	if ((msg_size_no_space) >= CLIENT_MAX_ALIAS) {
 		printf("/change_name: name too long\n");
 		return 1;
+	}	
+	
+	char msg_cp[CLIENT_MAX_ALIAS];
+	int cp_err = snprintf(msg_cp, ARRAY_SIZE(msg_cp), "%s", msg+1);
+	if (cp_err < 0) {
+		printf("/change_name: internal error\n");
+		return 1;
 	}
 
-	for (int i=1; i < msg_size; i++) {
-		int curr_char = (int)msg[i];
+	ssize_t msg_cp_size = msg_size_no_space;
+	if (msg_cp[msg_cp_size-2] == '\n') {
+		msg_cp[msg_cp_size-2] = '\0';
+		msg_cp_size--;
+	}
+
+	for (ssize_t i=0; i < msg_cp_size; i++) {
+		int curr_char = (int)msg_cp[i];
+
+		if (curr_char == 0) 
+			break;
+
 		if (isalpha(curr_char) == 0 && isalnum(curr_char) == 0) {
 			printf("/change_name: name must consist of only letters and numbers\n");
+			printf("user input: %s\n", msg_cp+1);
+
 			return 1;
 		}	
 	}
 
 	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
-	int err = snprintf(users->aliases[user_id], msg_size-1, "%s", msg+1);  
+	int err = snprintf(users->aliases[user_id], CLIENT_MAX_ALIAS, "%s", msg_cp);  
 	if (err < 0) {
 		printf("/change_name: name change fail\n");
 		return 1;
@@ -177,7 +197,10 @@ int change_name(const char *msg, const int msg_size, Users *users, int user_id) 
 }
 
 // TODO: show the name to the user
-int show_name(const char *msg, const int msg_size, Users *users, int user_id) { 
+int show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) { 
+	(void)msg;
+	(void)msg_size;
+
 	char *alias = users->aliases[user_id];
 	
 	if (alias[0] == '\0') {
@@ -189,7 +212,10 @@ int show_name(const char *msg, const int msg_size, Users *users, int user_id) {
 	return 0;
 }
 
-int remove_name(const char *msg, const int msg_size, Users *users, int user_id) {
+int remove_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+	(void)msg;
+	(void)msg_size;
+
 	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
 		
 	if(users->aliases[user_id][0] != '\0') {
@@ -212,18 +238,18 @@ Command commands[] = {
 };
 
 static int
-maybe_process_command(const char *msg, const int msg_size, Users *users, int user_id) {
+maybe_process_command(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	if (user_id < 0)
 		return 1;
 
 	if ((msg_size < 1) || (msg[0] == '\0'))
 		return 0;
 
-	for (int i=0; i<ARRAY_SIZE(commands); i++) {
+	for (size_t i=0; i<ARRAY_SIZE(commands); i++) {
 		const char *cmd_name = commands[i].name;
 		size_t name_len = strlen(cmd_name);
 
-		if (cmd_name[0] == '/' && msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
+		if (cmd_name[0] == '/' && (size_t)msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
 			return commands[i].handler(
 				msg + name_len, 
 				msg_size - name_len, 
@@ -446,7 +472,6 @@ int main(void) {
 			}
 
 			if (maybe_process_command(read_res, read_size, &users, user_id) != 0) {
-				printf("Process_commands: command check error");
 				return 1;
 			}
 
