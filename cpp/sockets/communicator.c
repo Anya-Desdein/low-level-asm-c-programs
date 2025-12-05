@@ -204,11 +204,26 @@ int show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id
 	char *alias = users->aliases[user_id];
 	
 	if (alias[0] == '\0') {
-		printf("/show_name: name not set\n");
+		const char msg_fail[] = "/show_name: name not set\n";
+		printf("%s", msg_fail);
+		ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_fail, ARRAY_SIZE(msg_fail));
+		if (send_err == -1)
+			return 1; 
+		// differentiation will make more sense after I'll change the way the function exits
 		return 1;
 	}
+
+	const char *msg_header = "/show_name: ";
+	ssize_t msg_header_size = strlen(msg_header);
 	
-	printf("%s\n", alias);
+	ssize_t msg_succ_size = msg_header_size + CLIENT_MAX_ALIAS + 1;
+	char msg_succ[msg_succ_size];
+	memset(msg_succ, 0, sizeof(msg_succ));
+
+	snprintf(msg_succ, msg_succ_size, "%s%s\n", msg_header, alias);
+	sock_send(users->clients[user_id], msg_succ, msg_succ_size);
+	printf("%s", msg_succ);
+
 	return 0;
 }
 
