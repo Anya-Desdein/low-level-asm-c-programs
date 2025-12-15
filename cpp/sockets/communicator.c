@@ -144,26 +144,35 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 	return 0;
 }	
 
-typedef int(*command_handler)(const char *msg, const ssize_t msg_size, Users *users, int user_id);
+typedef void(*command_handler)(const char *msg, const ssize_t msg_size, Users *users, int user_id);
 
-// TODO: printfs are send to users instead
-int change_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void change_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+	ssize_t send_err;
 	if (msg_size < 2 || isblank((int)msg[0]) == 0) {
-		printf("/change_name: missing name or incorrect formatting\n");
-		return 1;
+		const char msg_size_err[] = ("/change_name: missing name or incorrect formatting\n");
+		send_err = sock_send(users->clients[user_id], (char *)msg_size_err, ARRAY_SIZE(msg_size_err));
+		
+		if (send_err == -1)
+			printf("/change_name: sock_send: failed to send user message\n");
+		
+		return;
 	}
 	
 	const ssize_t msg_size_no_space = msg_size-1;
 	if ((msg_size_no_space) >= CLIENT_MAX_ALIAS) {
-		printf("/change_name: name too long\n");
-		return 1;
+		const char msg_size_err2[] = ("/change_name: name too long\n");
+		send_err = sock_send(users->clients[user_id], (char *)msg_size_err2, ARRAY_SIZE(msg_size_err2));
+
+		if (send_err == -1)
+			printf("/change_name: sock_send: failed to send user message\n");
+		return;
 	}	
 	
 	char msg_cp[CLIENT_MAX_ALIAS];
 	int cp_err = snprintf(msg_cp, ARRAY_SIZE(msg_cp), "%s", msg+1);
 	if (cp_err < 0) {
-		printf("/change_name: internal error\n");
-		return 1;
+		printf("/change_name: snprintf error\n");
+		return;
 	}
 
 	ssize_t msg_cp_size = msg_size_no_space;
@@ -179,38 +188,51 @@ int change_name(const char *msg, const ssize_t msg_size, Users *users, int user_
 			break;
 
 		if (isalpha(curr_char) == 0 && isalnum(curr_char) == 0) {
-			printf("/change_name: name must consist of only letters and numbers\n");
-			printf("user input: %s\n", msg_cp+1);
+			const char msg_type_err[] = ("/change_name: name must consist of only letters and numbers\n");
+			send_err = sock_send(users->clients[user_id], (char *)msg_type_err, ARRAY_SIZE(msg_type_err));
 
-			return 1;
+			if (send_err == -1)
+				printf("/show_name: sock_send: failed to send user message\n");
+
+			printf("/change_name: disallowed symbols used\nuser input: %s\n", msg_cp+1);
+
+			return;
 		}	
 	}
 
 	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
 	int err = snprintf(users->aliases[user_id], CLIENT_MAX_ALIAS, "%s", msg_cp);  
 	if (err < 0) {
+			const char msg_general_err[] = "/change_name: change failed: disallowed symbols used\n";
+
+			send_err = sock_send(users->clients[user_id], (char *)msg_general_err, ARRAY_SIZE(msg_general_err));
+
+			if (send_err == -1)
+				printf("/show_name: sock_send: failed to send user message\n");
+
+			printf("%suser input: %s\n", msg_general_err, msg_cp+1);
+
+
 		printf("/change_name: name change fail\n");
-		return 1;
+		return;
 	}
 	
-	return 0;
+	return;
 }
 
-// TODO: show the name to the user
-int show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) { 
+void show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) { 
 	(void)msg;
 	(void)msg_size;
 
 	char *alias = users->aliases[user_id];
 	
 	if (alias[0] == '\0') {
-		const char msg_fail[] = "/show_name: name not set\n";
-		printf("%s", msg_fail);
+		const char msg_fail[] = "/show_name: name not set\n\tuse /change_name to set it first\n";
 		ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_fail, ARRAY_SIZE(msg_fail));
 		if (send_err == -1)
-			return 1; 
-		// differentiation will make more sense after I'll change the way the function exits
-		return 1;
+			printf("/show_name: sock_send: failed to send user message\n");
+
+		return;
 	}
 
 	const char *msg_header = "/show_name: ";
@@ -222,23 +244,33 @@ int show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id
 
 	snprintf(msg_succ, msg_succ_size, "%s%s\n", msg_header, alias);
 	sock_send(users->clients[user_id], msg_succ, msg_succ_size);
-	printf("%s", msg_succ);
 
-	return 0;
+	return;
 }
 
-int remove_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void remove_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	(void)msg;
 	(void)msg_size;
 
 	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
 		
 	if(users->aliases[user_id][0] != '\0') {
-		printf("/change_name: name deletion fail\n");
-		return 1;
+		const char msg_fail[] = "/remove_name: name deletion fail\n";
+		ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_fail, ARRAY_SIZE(msg_fail));
+		if (send_err == -1)
+			printf("/remove_name: sock_send: failed to send user message\n");
+
+		printf("%s", msg_fail);
+		return;
 	}
 	
-	return 0;
+	const char msg_succ[] = "/remove_name: username deletion success\n";
+	
+	ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_succ, ARRAY_SIZE(msg_succ));
+	if (send_err == -1)
+		printf("/remove_name: sock_send: failed to send user message\n");
+
+	return;
 }
 
 typedef struct {
@@ -252,32 +284,36 @@ Command commands[] = {
 	{ .name = "/remove_name", .handler = remove_name},
 };
 
-/*
- * Returns whether the message should be further processed.
- */
+// If the message should be further processed, return 0
+// If not, return 1
 static int
 maybe_process_command(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
-	if (user_id < 0 || user_id >= CLIENT_MAX)
+	if (user_id < 0 || user_id >= CLIENT_MAX) {
+		printf("/maybe_process_command: user_id %d outside of range\n", user_id);
 		return 1;
+	}
 
 	if ((msg_size < 1) || (msg[0] == '\0'))
-		return 0;
+		return 1;
 
+	int handled = 0;
 	for (size_t i=0; i<ARRAY_SIZE(commands); i++) {
 		const char *cmd_name = commands[i].name;
 		size_t name_len = strlen(cmd_name);
 
 		if (cmd_name[0] == '/' && (size_t)msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
-			return commands[i].handler(
+			commands[i].handler(
 				msg + name_len, 
 				msg_size - name_len, 
 				users, 
 				user_id
 			);
+
+			handled = 1;
 		}	
 	}
 	
-	return 0;
+	return handled;
 }
 
 static ssize_t
@@ -489,8 +525,9 @@ int main(void) {
 				user_id = i;
 			}
 
-			if (maybe_process_command(read_res, read_size, &users, user_id) != 0) {
-				return 1;
+			int is_command = maybe_process_command(read_res, read_size, &users, user_id);
+			if (is_command == 1) {
+				continue;
 			}
 
 			memset(
