@@ -88,7 +88,7 @@ static ssize_t
 sock_send(int fd, char *buf, ssize_t bufsize) {
 	assert((fd >= 0) && "int fd missing in sock_send");
 	assert((buf != NULL) && "char *buf missing in sock_send");
-	assert((bufsize>1) && "ssize_t bufsize missing in sock_send");
+	assert((bufsize>=1) && "ssize_t bufsize missing in sock_send");
 
 	int e;
 	ssize_t n = 0, sent = 0;
@@ -283,13 +283,64 @@ void remove_name(const char *msg, const ssize_t msg_size, Users *users, int user
 typedef struct {
 	char *name;
 	command_handler handler;
+	char *usage;
 } Command;
 
 Command commands[] = {
-	{ .name = "/change_name", .handler = change_name},
-	{ .name = "/show_name",   .handler = show_name},
-	{ .name = "/remove_name", .handler = remove_name},
+	{ .name = "/change_name", .handler = change_name, .usage = "\n"},
+	{ .name = "/show_name",   .handler = show_name,	  .usage = "\n"},
+	{ .name = "/remove_name", .handler = remove_name, .usage = "\n"},
 };
+
+void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+	(void)msg;
+	(void)msg_size;
+	(void)users;
+
+	ssize_t send_err;
+	const char msg_begin[] = ("/help: Feeling stuck? This might help\n");
+	send_err = sock_send(users->clients[user_id], (char *)msg_begin, ARRAY_SIZE(msg_begin));
+	
+	if (send_err == -1) {
+		printf("/help: sock_send: failed to send user message\n");
+		return;
+	}
+
+	size_t command_count = sizeof(commands) / sizeof(commands[0]);
+	if (command_count < 1) {
+		printf("/help: failed to count commands\n");
+	}
+	
+	const char msg_list_header[] = ("listing all available commands:\n");
+	send_err = sock_send(users->clients[user_id], (char *)msg_list_header, ARRAY_SIZE(msg_list_header));
+	
+	if (send_err == -1) {
+		printf("/help: sock_send: failed to send user message\n");
+		return;
+	}
+
+	for (size_t i=0; i < command_count; i++) {
+		char	 *cmd 	  = commands[i].name;
+		ssize_t   cmd_len = strlen(cmd);
+
+		send_err = sock_send(users->clients[user_id], (char *)cmd, cmd_len);
+		if (send_err == -1) {
+			printf("/help: sock_send: failed to send user message\n");
+			return;
+		}
+
+		const char n[] = "\n";
+		ssize_t n_len = strlen(n);
+		send_err = sock_send(users->clients[user_id], (char *)n, n_len);
+		if (send_err == -1) {
+			printf("/help: sock_send: failed to send user message\n");
+			return;
+		}
+
+	}
+
+	return;
+}
 
 // If the message should be further processed, return 0
 // If not, return 1
@@ -304,20 +355,55 @@ maybe_process_command(const char *msg, const ssize_t msg_size, Users *users, int
 		return 1;
 
 	int handled = 0;
-	for (size_t i=0; i<ARRAY_SIZE(commands); i++) {
-		const char *cmd_name = commands[i].name;
-		size_t name_len = strlen(cmd_name);
+	if (msg[0] == '/') {
+		for (size_t i=0; i<ARRAY_SIZE(commands); i++) {
+			const char *cmd_name = commands[i].name;
+			size_t name_len = strlen(cmd_name);
 
-		if (cmd_name[0] == '/' && (size_t)msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
-			commands[i].handler(
-				msg + name_len, 
-				msg_size - name_len, 
-				users, 
-				user_id
+			if ((size_t)msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
+			
+				commands[i].handler(
+					msg + name_len, 
+					msg_size - name_len, 
+					users, 
+					user_id
+				);
+
+				handled = 1;
+				break;
+			}
+		}
+
+		if (handled == 0) {
+			const char help_txt[] = "/help";
+			size_t help_len = strlen(help_txt);
+
+			if (strncmp(msg, help_txt, help_len) == 0) {
+				
+					help(
+						msg + help_len, 
+						msg_size - help_len, 
+						users, 
+						user_id
+					);
+
+					handled = 1;
+			}	
+			
+			if (handled == 1)
+				return handled;
+
+			const char cmd_not_found[] = "/app: unknown command. use \"/help\" to list all available commands\n";
+			ssize_t send_err = sock_send(
+				users->clients[user_id], 
+				(char *)cmd_not_found, 
+				ARRAY_SIZE(cmd_not_found)
 			);
-
+			if (send_err == -1)
+				printf("/help: sock_send: failed to send user message\n");
+		
 			handled = 1;
-		}	
+		}
 	}
 	
 	return handled;
