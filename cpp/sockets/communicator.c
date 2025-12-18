@@ -187,12 +187,16 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 		if (curr_char == 0) 
 			break;
 
-		if (isalpha(curr_char) == 0 && isalnum(curr_char) == 0) {
-			const char msg_type_err[] = ("/change_name: name must consist of only letters and numbers\n");
+		if (isalpha(curr_char) == 0 && 
+		    isalnum(curr_char) == 0 && 
+		    curr_char != '_'	    &&
+		    curr_char != '-'
+		    ) {
+			const char msg_type_err[] = ("/change_name: name must consist of only letters, numbers, \"-\" or \"_\"n");
 			send_err = sock_send(users->clients[user_id], (char *)msg_type_err, ARRAY_SIZE(msg_type_err));
 
 			if (send_err == -1)
-				printf("/show_name: sock_send: failed to send user message\n");
+				printf("/change_name: sock_send: failed to send user message\n");
 
 			printf("/change_name: disallowed symbols used\nuser input: %s\n", msg_cp+1);
 
@@ -203,20 +207,23 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
 	int err = snprintf(users->aliases[user_id], CLIENT_MAX_ALIAS, "%s", msg_cp);  
 	if (err < 0) {
-			const char msg_general_err[] = "/change_name: change failed: disallowed symbols used\n";
+		const char msg_general_err[] = "/change_name: change failed: disallowed symbols used\n";
 
-			send_err = sock_send(users->clients[user_id], (char *)msg_general_err, ARRAY_SIZE(msg_general_err));
+		send_err = sock_send(users->clients[user_id], (char *)msg_general_err, ARRAY_SIZE(msg_general_err));
+		if (send_err == -1)
+			printf("/change_name: sock_send: failed to send user message\n");
 
-			if (send_err == -1)
-				printf("/show_name: sock_send: failed to send user message\n");
-
-			printf("%suser input: %s\n", msg_general_err, msg_cp+1);
-
-
-		printf("/change_name: name change fail\n");
+		printf("%suser input: %s\n", msg_general_err, msg_cp+1);
+		printf("/change_name: name change failed\n");
 		return;
 	}
-	
+
+	const char msg_success[] = "/change_name: name changed successfully\n";
+
+	send_err = sock_send(users->clients[user_id], (char *)msg_success, ARRAY_SIZE(msg_success));
+	if (send_err == -1)
+		printf("/change_name: sock_send: failed to send user message\n");
+
 	return;
 }
 
@@ -536,14 +543,27 @@ int main(void) {
 				sizeof(return_msg)
 			);
 
-			snprintf(
-				return_msg, 
-				sizeof(return_msg),
-				"%d: %s",
-				event_fd, 
-				read_res
-			);
-		
+			char *alias = users.aliases[user_id];
+			if (alias[0] != '\0') {
+				snprintf(
+					return_msg, 
+					sizeof(return_msg),
+					"%s: %s",
+					alias, 
+					read_res
+				);
+
+			} else {
+				snprintf(
+					return_msg, 
+					sizeof(return_msg),
+					"%d: %s",
+					event_fd, 
+					read_res
+				);
+			}
+
+	
 			for(size_t i=0; i<(ARRAY_SIZE(users.clients)); i++) {
 				if (users.clients[i] == -1)
 					continue;
