@@ -16,6 +16,8 @@
 
 #include <ctype.h>
 
+#include <sys/ioctl.h>
+
 #define SOCKET_PORT "/tmp/socket_test"
 #define CLIENT_QUEUE_MAX SOMAXCONN
 
@@ -287,9 +289,9 @@ typedef struct {
 } Command;
 
 Command commands[] = {
-	{ .name = "/change_name", .handler = change_name, .usage = "\n"},
-	{ .name = "/show_name",   .handler = show_name,	  .usage = "\n"},
-	{ .name = "/remove_name", .handler = remove_name, .usage = "\n"},
+	{ .name = "/change_name", .handler = change_name, .usage = "sets or changes the username. accepts only letters, numbers, \"-\" and \"_\"\n512 character limit\n"},
+	{ .name = "/show_name",   .handler = show_name,	  .usage = "shows the username.\n"},
+	{ .name = "/remove_name", .handler = remove_name, .usage = "removes the username. user id will be displayed instead\n"},
 };
 
 void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
@@ -298,9 +300,19 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	(void)users;
 
 	ssize_t send_err;
-	const char msg_begin[] = ("/help: Feeling stuck? This might help\n");
+
+	const char separatorl[] = "---------------------------------\n";
+	size_t separatorl_size = strlen(separatorl);
+
+	const char separator[] = "----------------------\n";
+	size_t separator_size = strlen(separator);
+
+	const char separators[] = "-----------\n";
+	size_t separators_size = strlen(separators);
+
+
+	const char msg_begin[] = "/help: Feeling stuck? This might help\n";
 	send_err = sock_send(users->clients[user_id], (char *)msg_begin, ARRAY_SIZE(msg_begin));
-	
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
@@ -311,17 +323,34 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 		printf("/help: failed to count commands\n");
 	}
 	
-	const char msg_list_header[] = ("listing all available commands:\n");
-	send_err = sock_send(users->clients[user_id], (char *)msg_list_header, ARRAY_SIZE(msg_list_header));
-	
+	send_err = sock_send(users->clients[user_id], (char *)separatorl, separatorl_size);
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
 	}
 
+	const char msg_list_header[] = ("listing all available commands:\n");
+	send_err = sock_send(users->clients[user_id], (char *)msg_list_header, ARRAY_SIZE(msg_list_header));
+	if (send_err == -1) {
+		printf("/help: sock_send: failed to send user message\n");
+		return;
+	}
+	
+	send_err = sock_send(users->clients[user_id], (char *)separator, separator_size);
+	if (send_err == -1) {
+		printf("/help: sock_send: failed to send user message\n");
+		return;
+	}
+	
 	for (size_t i=0; i < command_count; i++) {
-		char	 *cmd 	  = commands[i].name;
-		ssize_t   cmd_len = strlen(cmd);
+		char	  *cmd 	  	 = commands[i].name;
+		ssize_t    cmd_len 	 = strlen(cmd);
+
+		char	  *cmd_usage	 = commands[i].usage;
+		ssize_t    cmd_usage_len = strlen(cmd_usage);
+
+		const char subh[] 	 = "usage:"; 
+		ssize_t	   subh_len	 = ARRAY_SIZE(subh);
 
 		send_err = sock_send(users->clients[user_id], (char *)cmd, cmd_len);
 		if (send_err == -1) {
@@ -337,6 +366,32 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 			return;
 		}
 
+		send_err = sock_send(users->clients[user_id], (char *)subh, subh_len);
+		if (send_err == -1) {
+			printf("/help: sock_send: failed to send user message\n");
+			return;
+		}
+
+		send_err = sock_send(users->clients[user_id], (char *)cmd_usage, cmd_usage_len);
+		if (send_err == -1) {
+			printf("/help: sock_send: failed to send user message\n");
+			return;
+		}
+
+		if((i+1) == command_count)
+			break;
+
+		send_err = sock_send(users->clients[user_id], (char *)separators, separators_size);
+		if (send_err == -1) {
+			printf("/help: sock_send: failed to send user message\n");
+			return;
+		}
+	}
+
+	send_err = sock_send(users->clients[user_id], (char *)separatorl, separatorl_size);
+	if (send_err == -1) {
+		printf("/help: sock_send: failed to send user message\n");
+		return;
 	}
 
 	return;
