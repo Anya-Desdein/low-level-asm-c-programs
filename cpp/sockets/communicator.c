@@ -152,7 +152,7 @@ typedef void(*command_handler)(const char *msg, const ssize_t msg_size, Users *u
 
 void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	ssize_t send_err;
-	if (msg_size < 5 || msg[0] != ' ') {
+	if (msg_size < 2 || msg[0] != ' ') {
 		const char msg_size_err[] = ("//i: missing data or incorrect formatting\n");
 		send_err = sock_send(users->clients[user_id], (char *)msg_size_err, ARRAY_SIZE(msg_size_err));
 		
@@ -164,14 +164,17 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 
 	int input_id=-1, match=0, input_iter=1, max_id_len=3;
 
-	char id_buf[max_id_len];
-	memset(id_buf, 0, max_id_len);
-
+	char id_buf[max_id_len+1];
+	memset(id_buf, 0, max_id_len+1);
+	printf("0th char: %c", msg[0]);
+	printf("1st char: %c", msg[1]);
 	do {
 		int isdig = isdigit(msg[input_iter]);
 		
 		if (!isdig) {
-			const char msg_nanid[] = "//id: incorrect first argument: id is not a number\n";
+			printf("error: %c\n", msg[input_iter]);
+			const char msg_nanid[] = "//i: incorrect first argument: id is not a number\n";
+			printf("%s\n", msg_nanid);
 			send_err = sock_send(users->clients[user_id], (char *)msg_nanid, ARRAY_SIZE(msg_nanid));
 		
 			if (send_err == -1)
@@ -181,7 +184,9 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 		}
 	
 		if (max_id_len < input_iter && isdig != 0) {
-			const char msg_idtoobig[] = "//id: incorrect first argument: id is larger than maximum possible id value\n";
+			printf("error: %c\n", msg[input_iter]);
+			const char msg_idtoobig[] = "//i: incorrect first argument: id is larger than maximum possible id value\n";
+			printf("%s\n", msg_idtoobig);
 			send_err = sock_send(users->clients[user_id], (char *)msg_idtoobig, ARRAY_SIZE(msg_idtoobig));
 			
 			if (send_err == -1)
@@ -191,7 +196,9 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 		}
 
 		if (max_id_len < input_iter && msg[input_iter] != ' ') {
+			printf("error: %c\n", msg[input_iter]);
 			const char msg_spacefail[] = "//id: incorrect first argument: please separate recipient id from the message with a space\n";
+			printf("%s\n", msg_spacefail);
 			send_err = sock_send(users->clients[user_id], (char *)msg_spacefail, ARRAY_SIZE(msg_spacefail));
 			
 			if (send_err == -1)
