@@ -61,14 +61,12 @@ typedef struct {
 static int 
 remove_client(int fd, int *clients, int client_size, int *client_count) {
 	for(int i=0; i < client_size; i++) {
-		if (clients[i] == -1)
+		if (clients[i] != fd)
 			continue;
 
-		if (clients[i] == fd) {
-			clients[i] = -1;
-			client_count++; 
-			return 0;
-		}
+		clients[i] = -1;
+		client_count++; 
+		return 0;
 	}
 	
 	return -1;
