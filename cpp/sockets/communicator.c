@@ -48,7 +48,7 @@
 		#include <assert.h>
 		#define SOCK_STATIC_ASSERT(expr, msg) \
 			_Static_assert(expr, msg)
-	#else 
+	#else
 		#error "Minimal supported version is C11"
 	#endif
 #endif
@@ -58,21 +58,21 @@ typedef struct {
 	char aliases[CLIENT_MAX][CLIENT_MAX_ALIAS];
 } Users;
 
-static int 
+static int
 remove_client(int fd, int *clients, int client_size, int *client_count) {
 	for(int i=0; i < client_size; i++) {
 		if (clients[i] != fd)
 			continue;
 
 		clients[i] = -1;
-		client_count++; 
+		client_count++;
 		return 0;
 	}
-	
+
 	return -1;
 }
 
-static int 
+static int
 add_client(int fd, int *clients, int client_size, int *client_count) {
 	for(int i=0; i < client_size; i++) {
 		if (clients[i] != -1)
@@ -82,12 +82,12 @@ add_client(int fd, int *clients, int client_size, int *client_count) {
 		client_count--;
 		return 0;
 	}
-	
+
 	return -1;
 }
 
 static ssize_t
-sock_send(int fd, char *buf, ssize_t bufsize) {
+sock_send(const int fd, const char *buf, const ssize_t bufsize) {
 	assert((fd >= 0) && "int fd missing in sock_send");
 	assert((buf != NULL) && "char *buf missing in sock_send");
 	assert((bufsize>=1) && "ssize_t bufsize missing in sock_send");
@@ -96,15 +96,15 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 	ssize_t n = 0, sent = 0;
 	while (sent < bufsize) {
 		n = send(
-			fd, 
+			fd,
 			buf+sent,
 			bufsize - sent,
 			MSG_NOSIGNAL
 		);
 
 		if (n < 0) {
-			e = errno;	
-	
+			e = errno;
+
 			switch (e) {
 				case EINTR:
 					continue;
@@ -144,7 +144,7 @@ sock_send(int fd, char *buf, ssize_t bufsize) {
 		sent += n;
 	}
 	return 0;
-}	
+}
 
 typedef void(*command_handler)(const char *msg, const ssize_t msg_size, Users *users, int user_id);
 
@@ -152,11 +152,15 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 	ssize_t send_err;
 	if (msg_size < 2 || msg[0] != ' ') {
 		static const char msg_size_err[] = ("//i: missing data or incorrect formatting\n");
-		send_err = sock_send(users->clients[user_id], (char *)msg_size_err, ARRAY_SIZE(msg_size_err));
-		
+		send_err = sock_send(
+			users->clients[user_id],
+			msg_size_err,
+			ARRAY_SIZE(msg_size_err)
+		);
+
 		if (send_err == -1)
 			printf("//i: sock_send: failed to send user message\n");
-		
+
 		return;
 	}
 
@@ -167,29 +171,37 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 	printf("1st char: %c", msg[1]);
 	do {
 		int isdig = isdigit(msg[input_iter]);
-		
+
 		if (!isdig) {
 			printf("error: %c\n", msg[input_iter]);
 			static const char msg_nanid[] = "//i: incorrect first argument: id is not a number\n";
 			printf("%s\n", msg_nanid);
-			send_err = sock_send(users->clients[user_id], (char *)msg_nanid, ARRAY_SIZE(msg_nanid));
-		
+			send_err = sock_send(
+				users->clients[user_id],
+				msg_nanid,
+				ARRAY_SIZE(msg_nanid)
+			);
+
 			if (send_err == -1)
 				printf("//i: sock_send: failed to send user message\n");
-		
+
 			return;
 		}
-	
+
 		if (max_id_len < input_iter) {
 			if (isdig != 0) {
 				printf("error: %c\n", msg[input_iter]);
 				static const char msg_idtoobig[] = "//i: incorrect first argument: id is larger than maximum possible id value\n";
 				printf("%s\n", msg_idtoobig);
-				send_err = sock_send(users->clients[user_id], (char *)msg_idtoobig, ARRAY_SIZE(msg_idtoobig));
-				
+				send_err = sock_send(
+					users->clients[user_id],
+					msg_idtoobig,
+					ARRAY_SIZE(msg_idtoobig)
+				);
+
 				if (send_err == -1)
 					printf("//i: sock_send: failed to send user message\n");
-			
+
 				return;
 			}
 
@@ -197,14 +209,18 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 				printf("error: %c\n", msg[input_iter]);
 				static const char msg_spacefail[] = "//id: incorrect first argument: please separate recipient id from the message with a space\n";
 				printf("%s\n", msg_spacefail);
-				send_err = sock_send(users->clients[user_id], (char *)msg_spacefail, ARRAY_SIZE(msg_spacefail));
-				
+				send_err = sock_send(
+					users->clients[user_id],
+					msg_spacefail,
+					ARRAY_SIZE(msg_spacefail)
+				);
+
 				if (send_err == -1)
 					printf("//i: sock_send: failed to send user message\n");
-			
+
 				return;
 			}
-		
+
 			break;
 		}
 
@@ -218,7 +234,7 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 	int client_id;
 	for (int i=0; i < CLIENT_MAX; i++) {
 		client_id = users->clients[i];
-		if(client_id == -1) 
+		if(client_id == -1)
 			continue;
 
 		if(client_id == input_id) {
@@ -229,17 +245,21 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 
 	if (match == 0) {
 		static const char msg_id_not_found[] = ("//i: recipient id not found\n");
-		send_err = sock_send(users->clients[user_id], (char *)msg_id_not_found, ARRAY_SIZE(msg_id_not_found));
-			
+		send_err = sock_send(
+			users->clients[user_id],
+			msg_id_not_found,
+			ARRAY_SIZE(msg_id_not_found)
+		);
+
 		if (send_err == -1)
 			printf("//i: sock_send: failed to send user message\n");
-			
+
 		return;
 	}
 
 	int message_start = 1 + input_iter + 1, user_message_size = msg_size - message_start;
 	char *new_message = calloc(user_message_size+1, sizeof(char));
-	
+
 	if (new_message == NULL) {
 		printf("//i: failed to allocate buffer for private message\n");
 	}
@@ -248,8 +268,12 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 	snprintf(new_message, user_message_size+1, msg + message_start);
 	size_t new_message_size = (strlen(new_message));
 
-	send_err = sock_send(input_id, new_message, new_message_size);
-		
+	send_err = sock_send(
+		input_id,
+		new_message,
+		new_message_size
+	);
+
 	if (send_err == -1)
 		printf("//i: sock_send: failed to send user message\n");
 
@@ -260,11 +284,15 @@ void priv_name(const char *msg, const ssize_t msg_size, Users *users, int user_i
 	ssize_t send_err;
 	if (msg_size < 5 || isblank((int)msg[0]) == 0) {
 		static const char msg_size_err[] = ("//i: missing data or incorrect formatting\n");
-		send_err = sock_send(users->clients[user_id], (char *)msg_size_err, ARRAY_SIZE(msg_size_err));
-		
+		send_err = sock_send(
+			users->clients[user_id],
+			msg_size_err,
+			ARRAY_SIZE(msg_size_err)
+		);
+
 		if (send_err == -1)
 			printf("//i: sock_send: failed to send user message\n");
-		
+
 		return;
 	}
 
@@ -278,24 +306,32 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 	ssize_t send_err;
 	if (msg_size < 2 || isblank((int)msg[0]) == 0) {
 		static const char msg_size_err[] = ("/change_name: missing name or incorrect formatting\n");
-		send_err = sock_send(users->clients[user_id], (char *)msg_size_err, ARRAY_SIZE(msg_size_err));
-		
+		send_err = sock_send(
+			users->clients[user_id],
+			msg_size_err,
+			ARRAY_SIZE(msg_size_err)
+		);
+
 		if (send_err == -1)
 			printf("/change_name: sock_send: failed to send user message\n");
-		
+
 		return;
 	}
-	
+
 	const ssize_t msg_size_no_space = msg_size-1;
 	if ((msg_size_no_space) >= CLIENT_MAX_ALIAS) {
 		static const char msg_size_err2[] = ("/change_name: name too long\n");
-		send_err = sock_send(users->clients[user_id], (char *)msg_size_err2, ARRAY_SIZE(msg_size_err2));
+		send_err = sock_send(
+			users->clients[user_id],
+			msg_size_err2,
+			ARRAY_SIZE(msg_size_err2)
+		);
 
 		if (send_err == -1)
 			printf("/change_name: sock_send: failed to send user message\n");
 		return;
-	}	
-	
+	}
+
 	char msg_cp[CLIENT_MAX_ALIAS];
 	int cp_err = snprintf(msg_cp, ARRAY_SIZE(msg_cp), "%s", msg+1);
 	if (cp_err < 0) {
@@ -312,16 +348,20 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 	for (ssize_t i=0; i < msg_cp_size; i++) {
 		int curr_char = (int)msg_cp[i];
 
-		if (curr_char == 0) 
+		if (curr_char == 0)
 			break;
 
-		if (isalpha(curr_char) == 0 && 
-		    isalnum(curr_char) == 0 && 
+		if (isalpha(curr_char) == 0 &&
+		    isalnum(curr_char) == 0 &&
 		    curr_char != '_'	    &&
 		    curr_char != '-'
 		    ) {
 			static const char msg_type_err[] = ("/change_name: name must consist of only letters, numbers, \"-\" or \"_\"n");
-			send_err = sock_send(users->clients[user_id], (char *)msg_type_err, ARRAY_SIZE(msg_type_err));
+			send_err = sock_send(
+				users->clients[user_id],
+				msg_type_err,
+				ARRAY_SIZE(msg_type_err)
+			);
 
 			if (send_err == -1)
 				printf("/change_name: sock_send: failed to send user message\n");
@@ -329,15 +369,19 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 			printf("/change_name: disallowed symbols used\nuser input: %s\n", msg_cp+1);
 
 			return;
-		}	
+		}
 	}
 
-	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
-	int err = snprintf(users->aliases[user_id], CLIENT_MAX_ALIAS, "%s", msg_cp);  
+	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS);
+	int err = snprintf(users->aliases[user_id], CLIENT_MAX_ALIAS, "%s", msg_cp);
 	if (err < 0) {
 		static const char msg_general_err[] = "/change_name: change failed: disallowed symbols used\n";
 
-		send_err = sock_send(users->clients[user_id], (char *)msg_general_err, ARRAY_SIZE(msg_general_err));
+		send_err = sock_send(
+			users->clients[user_id],
+			msg_general_err,
+			ARRAY_SIZE(msg_general_err)
+		);
 		if (send_err == -1)
 			printf("/change_name: sock_send: failed to send user message\n");
 
@@ -348,23 +392,31 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 
 	static const char msg_success[] = "/change_name: name changed successfully\n";
 
-	send_err = sock_send(users->clients[user_id], (char *)msg_success, ARRAY_SIZE(msg_success));
+	send_err = sock_send(
+		users->clients[user_id],
+		msg_success,
+		ARRAY_SIZE(msg_success)
+	);
 	if (send_err == -1)
 		printf("/change_name: sock_send: failed to send user message\n");
 
 	return;
 }
 
-void show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) { 
+void show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	(void)msg;
 	(void)msg_size;
 
 	char *alias = users->aliases[user_id];
-	
+
 	if (alias[0] == '\0') {
 		static const char msg_fail[] = "/show_name: name not set\n\tuse /change_name to set it first\n";
 
-		ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_fail, ARRAY_SIZE(msg_fail));
+		ssize_t send_err = sock_send(
+			users->clients[user_id],
+			msg_fail,
+			ARRAY_SIZE(msg_fail)
+		);
 		if (send_err == -1)
 			printf("/show_name: sock_send: failed to send user message\n");
 
@@ -373,7 +425,7 @@ void show_name(const char *msg, const ssize_t msg_size, Users *users, int user_i
 
 	static const char *msg_header = "/show_name: ";
 	ssize_t msg_header_size = strlen(msg_header);
-	
+
 	ssize_t msg_succ_size = msg_header_size + CLIENT_MAX_ALIAS + 1;
 	char msg_succ[msg_succ_size];
 	memset(msg_succ, 0, sizeof(msg_succ));
@@ -388,21 +440,25 @@ void remove_name(const char *msg, const ssize_t msg_size, Users *users, int user
 	(void)msg;
 	(void)msg_size;
 
-	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS); 
-		
+	memset(users->aliases[user_id], '\0', CLIENT_MAX_ALIAS);
+
 	if(users->aliases[user_id][0] != '\0') {
 		static const char msg_fail[] = "/remove_name: name deletion fail\n";
-		ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_fail, ARRAY_SIZE(msg_fail));
+		ssize_t send_err = sock_send(
+			users->clients[user_id],
+			msg_fail,
+			ARRAY_SIZE(msg_fail)
+		);
 		if (send_err == -1)
 			printf("/remove_name: sock_send: failed to send user message\n");
 
 		printf("%s", msg_fail);
 		return;
 	}
-	
+
 	static const char msg_succ[] = "/remove_name: username deletion success\n";
-	
-	ssize_t send_err = sock_send(users->clients[user_id], (char *)msg_succ, ARRAY_SIZE(msg_succ));
+
+	ssize_t send_err = sock_send(users->clients[user_id], msg_succ, ARRAY_SIZE(msg_succ));
 	if (send_err == -1)
 		printf("/remove_name: sock_send: failed to send user message\n");
 
@@ -441,7 +497,7 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 
 
 	static const char msg_begin[] = "/help: Feeling stuck? This might help\n";
-	send_err = sock_send(users->clients[user_id], (char *)msg_begin, ARRAY_SIZE(msg_begin));
+	send_err = sock_send(users->clients[user_id], msg_begin, ARRAY_SIZE(msg_begin));
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
@@ -451,26 +507,26 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	if (command_count < 1) {
 		printf("/help: failed to count commands\n");
 	}
-	
-	send_err = sock_send(users->clients[user_id], (char *)separatorl, separatorl_size);
+
+	send_err = sock_send(users->clients[user_id], separatorl, separatorl_size);
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
 	}
 
 	static const char msg_list_header[] = ("listing all available commands:\n");
-	send_err = sock_send(users->clients[user_id], (char *)msg_list_header, ARRAY_SIZE(msg_list_header));
+	send_err = sock_send(users->clients[user_id], msg_list_header, ARRAY_SIZE(msg_list_header));
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
 	}
-	
-	send_err = sock_send(users->clients[user_id], (char *)separator, separator_size);
+
+	send_err = sock_send(users->clients[user_id], separator, separator_size);
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
 	}
-	
+
 	for (size_t i=0; i < command_count; i++) {
 		char	  *cmd 	  	 = commands[i].name;
 		ssize_t    cmd_len 	 = strlen(cmd);
@@ -478,10 +534,10 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 		char	  *cmd_usage	 = commands[i].usage;
 		ssize_t    cmd_usage_len = strlen(cmd_usage);
 
-		static const char subh[] = "desc: "; 
+		static const char subh[] = "desc: ";
 		ssize_t	   subh_len	 = ARRAY_SIZE(subh);
 
-		send_err = sock_send(users->clients[user_id], (char *)cmd, cmd_len);
+		send_err = sock_send(users->clients[user_id], cmd, cmd_len);
 		if (send_err == -1) {
 			printf("/help: sock_send: failed to send user message\n");
 			return;
@@ -489,19 +545,19 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 
 		static const char n[] = "\n";
 		ssize_t n_len = strlen(n);
-		send_err = sock_send(users->clients[user_id], (char *)n, n_len);
+		send_err = sock_send(users->clients[user_id], n, n_len);
 		if (send_err == -1) {
 			printf("/help: sock_send: failed to send user message\n");
 			return;
 		}
 
-		send_err = sock_send(users->clients[user_id], (char *)subh, subh_len);
+		send_err = sock_send(users->clients[user_id], subh, subh_len);
 		if (send_err == -1) {
 			printf("/help: sock_send: failed to send user message\n");
 			return;
 		}
 
-		send_err = sock_send(users->clients[user_id], (char *)cmd_usage, cmd_usage_len);
+		send_err = sock_send(users->clients[user_id], cmd_usage, cmd_usage_len);
 		if (send_err == -1) {
 			printf("/help: sock_send: failed to send user message\n");
 			return;
@@ -510,14 +566,14 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 		if((i+1) == command_count)
 			break;
 
-		send_err = sock_send(users->clients[user_id], (char *)separators, separators_size);
+		send_err = sock_send(users->clients[user_id], separators, separators_size);
 		if (send_err == -1) {
 			printf("/help: sock_send: failed to send user message\n");
 			return;
 		}
 	}
 
-	send_err = sock_send(users->clients[user_id], (char *)separatorl, separatorl_size);
+	send_err = sock_send(users->clients[user_id], separatorl, separatorl_size);
 	if (send_err == -1) {
 		printf("/help: sock_send: failed to send user message\n");
 		return;
@@ -545,11 +601,11 @@ maybe_process_command(const char *msg, const ssize_t msg_size, Users *users, int
 			size_t name_len = strlen(cmd_name);
 
 			if ((size_t)msg_size >= name_len && (strncmp(msg, cmd_name, name_len) == 0)) {
-			
+
 				commands[i].handler(
-					msg + name_len, 
-					msg_size - name_len, 
-					users, 
+					msg + name_len,
+					msg_size - name_len,
+					users,
 					user_id
 				);
 
@@ -563,33 +619,33 @@ maybe_process_command(const char *msg, const ssize_t msg_size, Users *users, int
 			size_t help_len = strlen(help_txt);
 
 			if (strncmp(msg, help_txt, help_len) == 0) {
-				
+
 					help(
-						msg + help_len, 
-						msg_size - help_len, 
-						users, 
+						msg + help_len,
+						msg_size - help_len,
+						users,
 						user_id
 					);
 
 					handled = 1;
-			}	
-			
+			}
+
 			if (handled == 1)
 				return handled;
 
 			static const char cmd_not_found[] = "/app: unknown command. use \"/help\" to list all available commands\n";
 			ssize_t send_err = sock_send(
-				users->clients[user_id], 
-				(char *)cmd_not_found, 
+				users->clients[user_id],
+				cmd_not_found,
 				ARRAY_SIZE(cmd_not_found)
 			);
 			if (send_err == -1)
 				printf("/help: sock_send: failed to send user message\n");
-		
+
 			handled = 1;
 		}
 	}
-	
+
 	return handled;
 }
 
@@ -603,20 +659,20 @@ sock_read(int fd, char *buf, ssize_t bufsize) {
 	ssize_t n = 0, filled = 0;
 	while (filled < bufsize) {
 		n = read(
-			fd, 
+			fd,
 			buf+filled,
 			bufsize - filled
 		);
 
 		if (n < 0) {
-			e = errno;	
-			if (e == EINTR) 
+			e = errno;
+			if (e == EINTR)
 				continue;
 
 			if (e == EAGAIN) {
 				return filled;
 			}
-			
+
 			#if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
 				if (e == EWOULDBLOCK) {
 					return filled;
@@ -675,7 +731,7 @@ int main(void) {
 
 	struct epoll_event ev, events[MAX_EVENTS];
 	int ready, epollfd;
-	
+
 	epollfd = epoll_create1(0);
 	if (epollfd == -1) {
 		perror("epoll_create1");
@@ -688,7 +744,7 @@ int main(void) {
 		perror("epoll_ctl: fd");
 		return 1;
 	}
-	
+
 	uint32_t new_ev;
 	int event_fd, new_sock;
 	ssize_t read_size, send_err;
@@ -710,7 +766,7 @@ int main(void) {
 
 			if (event_fd == 0 || new_ev == 0)
 				continue;
-			
+
 			if (event_fd == fd) {
 				new_sock = accept4(event_fd, NULL, NULL, SOCK_NONBLOCK);
 				if (new_sock == -1) {
@@ -718,7 +774,7 @@ int main(void) {
 					close(new_sock);
 					continue;
 				}
-			
+
 				memset(&ev, 0, sizeof(ev));
 				ev.events = EPOLLIN;
 				ev.data.fd = new_sock;
@@ -733,12 +789,12 @@ int main(void) {
 				}
 
 				if (add_client(
-					new_sock, 
-					users.clients, 
+					new_sock,
+					users.clients,
 					ARRAY_SIZE(users.clients),
 					&client_count
 					) != 0) {
-					printf("Add_client: failed to add a new client\n");	
+					printf("Add_client: failed to add a new client\n");
 				}
 
 				if (new_ev & EPOLLERR) {
@@ -746,20 +802,20 @@ int main(void) {
 					printf("LISTENING SOCK: epoll err\n");
 					return 1;
 				}
-				continue;	
+				continue;
 			}
 
 			memset(
-				read_res, 
-				0, 
+				read_res,
+				0,
 				sizeof(read_res)
 			);
 
 			read_size = sock_read(event_fd, read_res, BUF_SIZE);
 			if (read_size == -1) {
 				epoll_ctl(
-					epollfd, 
-					EPOLL_CTL_DEL, 
+					epollfd,
+					EPOLL_CTL_DEL,
 					event_fd,
 					0
 				);
@@ -771,8 +827,8 @@ int main(void) {
 				// No data to read, sth is wrong
 				printf("SOCK: uncaught read error.\n");
 				epoll_ctl(
-					epollfd, 
-					EPOLL_CTL_DEL, 
+					epollfd,
+					EPOLL_CTL_DEL,
 					event_fd,
 					0
 				);
@@ -781,24 +837,24 @@ int main(void) {
 			}
 
 			if (
-				(new_ev & EPOLLERR) 
+				(new_ev & EPOLLERR)
 				|| (new_ev & EPOLLHUP)
 			) {
 				epoll_ctl(
-					epollfd, 
-					EPOLL_CTL_DEL, 
+					epollfd,
+					EPOLL_CTL_DEL,
 					event_fd,
 					0
 				);
 
 				close(event_fd);
-			}			
-			
+			}
+
 			int user_id = -1;
 			for(int i=0; i < CLIENT_MAX; i++) {
-				if (users.clients[i] != event_fd) 
+				if (users.clients[i] != event_fd)
 					continue;
-				
+
 				user_id = i;
 			}
 
@@ -808,32 +864,32 @@ int main(void) {
 			}
 
 			memset(
-				return_msg, 
-				0, 
+				return_msg,
+				0,
 				sizeof(return_msg)
 			);
 
 			char *alias = users.aliases[user_id];
 			if (alias[0] != '\0') {
 				snprintf(
-					return_msg, 
+					return_msg,
 					sizeof(return_msg),
 					"%s: %s",
-					alias, 
+					alias,
 					read_res
 				);
 
 			} else {
 				snprintf(
-					return_msg, 
+					return_msg,
 					sizeof(return_msg),
 					"%d: %s",
-					event_fd, 
+					event_fd,
 					read_res
 				);
 			}
 
-	
+
 			for(size_t i=0; i<(ARRAY_SIZE(users.clients)); i++) {
 				if (users.clients[i] == -1)
 					continue;
@@ -842,34 +898,34 @@ int main(void) {
 					continue;
 
 				send_err = sock_send(
-					users.clients[i], 
-					return_msg, 
+					users.clients[i],
+					return_msg,
 					BUF_SIZE
 				);
 				if (send_err == -1) {
 					epoll_ctl(
-						epollfd, 
-						EPOLL_CTL_DEL, 
+						epollfd,
+						EPOLL_CTL_DEL,
 						users.clients[i],
 						0
 					);
-					
+
 					if (remove_client(
-						users.clients[i], 
-						users.clients, 
+						users.clients[i],
+						users.clients,
 						ARRAY_SIZE(users.clients),
 						&client_count
 						) != 0) {
 						printf("Remove_client: client not removed\n");
 						return 1;
 					}
-						
+
 					close(event_fd);
 				}
 			}
 		}
 	}
-	
+
 	close(fd);
 	return 0;
 }
