@@ -59,7 +59,7 @@ typedef struct {
 } Users;
 
 static int
-remove_client(int fd, int *clients, int client_size, int *client_count) {
+remove_client(const int fd, int *clients, const int client_size, int *client_count) {
 	for(int i=0; i < client_size; i++) {
 		if (clients[i] != fd)
 			continue;
@@ -73,7 +73,7 @@ remove_client(int fd, int *clients, int client_size, int *client_count) {
 }
 
 static int
-add_client(int fd, int *clients, int client_size, int *client_count) {
+add_client(const int fd, int *clients, const int client_size, int *client_count) {
 	for(int i=0; i < client_size; i++) {
 		if (clients[i] != -1)
 			continue;
@@ -146,9 +146,16 @@ sock_send(const int fd, const char *buf, const ssize_t bufsize) {
 	return 0;
 }
 
-typedef void(*command_handler)(const char *msg, const ssize_t msg_size, Users *users, int user_id);
+typedef void(*command_handler)(
+	const char *msg, const ssize_t msg_size, Users *users, const int user_id
+);
 
-void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void priv_id(
+	const char *msg, 
+	const ssize_t msg_size, 
+	Users *users, 
+	const int user_id
+) {
 	ssize_t send_err;
 	if (msg_size < 2 || msg[0] != ' ') {
 		static const char msg_size_err[] = ("//i: missing data or incorrect formatting\n");
@@ -280,7 +287,12 @@ void priv_id(const char *msg, const ssize_t msg_size, Users *users, int user_id)
 	return;
 }
 
-void priv_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void priv_name(
+	const char *msg, 
+	const ssize_t msg_size, 
+	Users *users, 
+	const int user_id
+) {
 	ssize_t send_err;
 	if (msg_size < 5 || isblank((int)msg[0]) == 0) {
 		static const char msg_size_err[] = ("//i: missing data or incorrect formatting\n");
@@ -302,7 +314,12 @@ void priv_name(const char *msg, const ssize_t msg_size, Users *users, int user_i
 	return;
 }
 
-void change_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void change_name(
+	const char *msg, 
+	const ssize_t msg_size, 
+	Users *users, 
+	const int user_id
+) {
 	ssize_t send_err;
 	if (msg_size < 2 || isblank((int)msg[0]) == 0) {
 		static const char msg_size_err[] = ("/change_name: missing name or incorrect formatting\n");
@@ -403,7 +420,11 @@ void change_name(const char *msg, const ssize_t msg_size, Users *users, int user
 	return;
 }
 
-void show_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void show_name(
+	const char *msg, 
+	const ssize_t msg_size, 
+	Users *users, const int user_id
+) {
 	(void)msg;
 	(void)msg_size;
 
@@ -436,7 +457,11 @@ void show_name(const char *msg, const ssize_t msg_size, Users *users, int user_i
 	return;
 }
 
-void remove_name(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
+void remove_name(
+	const char *msg, 
+	const ssize_t msg_size, 
+	Users *users, const int user_id
+) {
 	(void)msg;
 	(void)msg_size;
 
@@ -466,9 +491,9 @@ void remove_name(const char *msg, const ssize_t msg_size, Users *users, int user
 }
 
 typedef struct {
-	char *name;
+	const char *name;
 	command_handler handler;
-	char *usage;
+	const char *usage;
 } Command;
 
 Command commands[] = {
@@ -528,14 +553,14 @@ void help(const char *msg, const ssize_t msg_size, Users *users, int user_id) {
 	}
 
 	for (size_t i=0; i < command_count; i++) {
-		char	  *cmd 	  	 = commands[i].name;
-		ssize_t    cmd_len 	 = strlen(cmd);
+		const char 	 *cmd 	  	= commands[i].name;
+		const ssize_t     cmd_len 	= strlen(cmd);
 
-		char	  *cmd_usage	 = commands[i].usage;
-		ssize_t    cmd_usage_len = strlen(cmd_usage);
+		const char 	 *cmd_usage	= commands[i].usage;
+		const ssize_t	  cmd_usage_len	= strlen(cmd_usage);
 
-		static const char subh[] = "desc: ";
-		ssize_t	   subh_len	 = ARRAY_SIZE(subh);
+		static const char subh[] 	= "desc: ";
+		const ssize_t	  subh_len	= ARRAY_SIZE(subh);
 
 		send_err = sock_send(users->clients[user_id], cmd, cmd_len);
 		if (send_err == -1) {
