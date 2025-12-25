@@ -171,11 +171,12 @@ void priv_id(
 		return;
 	}
 
-	int input_id=-1, match=0, input_iter=1, max_id_len=3;
+	int input_id=-1, match=0, input_iter=1;
+	const int max_id_len=3;
 
 	char id_buf[max_id_len+1];
 	memset(id_buf, 0, max_id_len+1);
-	printf("1st char: %c", msg[1]);
+
 	do {
 		int isdig = isdigit(msg[input_iter]);
 
@@ -214,7 +215,7 @@ void priv_id(
 
 			if (msg[input_iter] != ' ') {
 				printf("error: %c\n", msg[input_iter]);
-				static const char msg_spacefail[] = "//id: incorrect first argument: please separate recipient id from the message with a space\n";
+				static const char msg_spacefail[] = "//id: incorrect argument: please separate recipient id from the message with a space\n";
 				printf("%s\n", msg_spacefail);
 				send_err = sock_send(
 					users->clients[user_id],
@@ -264,7 +265,7 @@ void priv_id(
 		return;
 	}
 
-	int message_start = 1 + input_iter + 1, user_message_size = msg_size - message_start;
+	const int message_start = input_iter + 1, user_message_size = msg_size - message_start;
 	char *new_message = calloc(user_message_size+1, sizeof(char));
 
 	if (new_message == NULL) {
@@ -273,7 +274,7 @@ void priv_id(
 	memset(new_message, 0, user_message_size+1);
 
 	snprintf(new_message, user_message_size+1, msg + message_start);
-	size_t new_message_size = (strlen(new_message));
+	const size_t new_message_size = (strlen(new_message));
 
 	send_err = sock_send(
 		input_id,
