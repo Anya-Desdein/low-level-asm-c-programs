@@ -151,10 +151,10 @@ typedef void(*command_handler)(
 );
 
 void priv_id(
-	const char *msg, 
-	const ssize_t msg_size, 
-	Users *users, 
-	const int user_id
+	const char 	*msg, 
+	const ssize_t 	 msg_size, 
+	Users 		*users, 
+	const int 	 user_id
 ) {
 	ssize_t send_err;
 	if (msg_size < 2 || msg[0] != ' ') {
@@ -178,10 +178,11 @@ void priv_id(
 	memset(id_buf, 0, max_id_len+1);
 
 	do {
-		int isdig = isdigit(msg[input_iter]);
+		const char symbol = msg[input_iter];
+		const int  isdig  = symbol;
 
 		if (!isdig) {
-			printf("error: %c\n", msg[input_iter]);
+			printf("error: %c\n", symbol);
 			static const char msg_nanid[] = "//i: incorrect first argument: id is not a number\n";
 			printf("%s\n", msg_nanid);
 			send_err = sock_send(
@@ -198,7 +199,7 @@ void priv_id(
 
 		if (max_id_len < input_iter) {
 			if (isdig != 0) {
-				printf("error: %c\n", msg[input_iter]);
+				printf("error: %c\n", symbol);
 				static const char msg_idtoobig[] = "//i: incorrect first argument: id is larger than maximum possible id value\n";
 				printf("%s\n", msg_idtoobig);
 				send_err = sock_send(
@@ -213,8 +214,8 @@ void priv_id(
 				return;
 			}
 
-			if (msg[input_iter] != ' ') {
-				printf("error: %c\n", msg[input_iter]);
+			if (symbol != ' ') {
+				printf("error: %c\n", symbol);
 				static const char msg_spacefail[] = "//i: incorrect argument: please separate recipient id from the message with a space\n";
 				printf("%s\n", msg_spacefail);
 				send_err = sock_send(
@@ -232,10 +233,10 @@ void priv_id(
 			break;
 		}
 
-		id_buf[input_iter-1] = msg[input_iter];
+		id_buf[input_iter-1] = symbol;
 
 		input_iter++;
-	} while (input_iter < (max_id_len+1) && msg[input_iter] != ' ');
+	} while (input_iter < (max_id_len+1) && msg[input_iter] != ' ' && msg[input_iter] != '\0');
 
 	input_id = atoi(id_buf);
 
@@ -289,10 +290,10 @@ void priv_id(
 }
 
 void priv_name(
-	const char *msg, 
-	const ssize_t msg_size, 
-	Users *users, 
-	const int user_id
+	const char 	*msg, 
+	const ssize_t 	 msg_size, 
+	Users 		*users, 
+	const int 	 user_id
 ) {
 	ssize_t send_err;
 	if (msg_size < 2 || msg[0] != ' ') {
@@ -309,18 +310,25 @@ void priv_name(
 		return;
 	}
 
-	int input_id=-1, match=0, input_iter=1;
-	const int max_id_len=3;
+	int match=0, input_iter=1;
+	const int max_name_len = CLIENT_MAX_ALIAS-1;
 
-	char id_buf[max_id_len+1];
-	memset(id_buf, 0, max_id_len+1);
+	char name_buf[max_name_len+1];;
+	memset(name_buf, 0, max_name_len+1);
 
 	do {
-		int isdig = isdigit(msg[input_iter]);
+		const char symbol = msg[input_iter];
+		const int  isdig  = isdigit(symbol);
+		const int  isal   = isalpha(symbol);
 
-		if (!isdig) {
-			printf("error: %c\n", msg[input_iter]);
-			static const char msg_nanid[] = "//n: incorrect first argument: id is not a number\n";
+		if (
+			!isal  		&& 
+			!isdig 		&& 
+			symbol != '_' 	&&
+			symbol != '-'
+		) {
+			printf("error: %c\n", symbol);
+			static const char msg_nanid[] = "//n: incorrect first argument: illegal character in name\n";
 			printf("%s\n", msg_nanid);
 			send_err = sock_send(
 				users->clients[user_id],
@@ -331,13 +339,9 @@ void priv_name(
 			if (send_err == -1)
 				printf("//n: sock_send: failed to send user message\n");
 
-			return;
-		}
-
-		if (max_id_len < input_iter) {
-			if (isdig != 0) {
-				printf("error: %c\n", msg[input_iter]);
-				static const char msg_idtoobig[] = "//n: incorrect first argument: id is larger than maximum possible id value\n";
+			if (max_name_len < input_iter) {
+				printf("error: %c\n", symbol);
+				static const char msg_idtoobig[] = "//n: incorrect first argument: name is larger than maximum possible name lenght\n";
 				printf("%s\n", msg_idtoobig);
 				send_err = sock_send(
 					users->clients[user_id],
@@ -351,42 +355,40 @@ void priv_name(
 				return;
 			}
 
-			if (msg[input_iter] != ' ') {
-				printf("error: %c\n", msg[input_iter]);
-				static const char msg_spacefail[] = "//n: incorrect argument: please separate recipient id from the message with a space\n";
-				printf("%s\n", msg_spacefail);
-				send_err = sock_send(
-					users->clients[user_id],
-					msg_spacefail,
-					ARRAY_SIZE(msg_spacefail)
-				);
-
-				if (send_err == -1)
-					printf("//n: sock_send: failed to send user message\n");
-
-				return;
-			}
-
-			break;
+			return;
 		}
 
-		id_buf[input_iter-1] = msg[input_iter];
+		if (symbol != ' ') {
+			printf("error: %c\n", symbol);
+			static const char msg_spacefail[] = "//n: incorrect argument: please separate recipient id from the message with a space\n";
+			printf("%s\n", msg_spacefail);
+			send_err = sock_send(
+				users->clients[user_id],
+				msg_spacefail,
+				ARRAY_SIZE(msg_spacefail)
+			);
+
+			if (send_err == -1)
+				printf("//n: sock_send: failed to send user message\n");
+
+			return;
+		}
+
+		name_buf[input_iter-1] = symbol;
 
 		input_iter++;
-	} while (input_iter < (max_id_len+1) && msg[input_iter] != ' ');
+	} while (input_iter < (max_name_len+1) && msg[input_iter] != ' ' && msg[input_iter] != '\0');
 
-	input_id = atoi(id_buf);
+	char client_name[CLIENT_MAX_ALIAS];
 
-	int client_id;
 	for (int i=0; i < CLIENT_MAX; i++) {
-		client_id = users->clients[i];
-		if(client_id == -1)
+		strcpy(client_name, users->aliases[i]);
+		if(!client_name[0])
 			continue;
 
-		if(client_id == input_id) {
-			match = 1;
+		match = strcmp(client_name, name_buf);
+		if(match == 1)
 			break;
-		}
 	}
 
 	if (match == 0) {
@@ -415,7 +417,7 @@ void priv_name(
 	const size_t new_message_size = (strlen(new_message));
 
 	send_err = sock_send(
-		input_id,
+		name_buf,
 		new_message,
 		new_message_size
 	);
