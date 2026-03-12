@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
 	bsize = sizeof(E_phdr);
 
 	// Used only for e_type == 3
-	uint64_t lowest_addr=0, highest_addr=0, alloc_size=0;
+	uint64_t lowest_addr=UINT64_MAX, highest_addr=0, alloc_size=0;
 	void* alloc_type2_addr = NULL;
 
 	if (h.e_type == 3){
@@ -209,18 +209,11 @@ int main(int argc, char *argv[]) {
 			re = read_usys(&file_descr, buf, &bsize, 0);
 			if (re) 
 				return 1;
-
-			// Offset in file
-			if (ph.p_offset < 0) {
-				printf("Incorrect offset: %" PRIu64 "\n", ph.p_offset);
-				return 1;
-			}
 		
 			// Add only Loadable segment sizes
 			if (ph.p_type != 1) {
 				continue;
 			}
-
 
 			// Count pages to allocate for the whole program
 			if (lowest_addr > ph.p_vaddr)
@@ -243,7 +236,7 @@ int main(int argc, char *argv[]) {
 		unsigned int temp_prot_flags = 0 | PROT_READ | PROT_WRITE;
 		
 		// Let MMU choose the addr, making it random
-		alloc_type2_addr = mmap(NULL, alloc_size, temp_page_flags, temp_page_flags, -1, 0);
+		alloc_type2_addr = mmap(NULL, alloc_size, temp_prot_flags, temp_page_flags, -1, 0);
 		
 		if (alloc_type2_addr == MAP_FAILED) {
 			perror("mmap");
@@ -262,12 +255,6 @@ int main(int argc, char *argv[]) {
 		re = read_usys(&file_descr, buf, &bsize, 0);
 		if (re) 
 			return 1;
-	
-		// Negative offset
-		if (ph.p_offset < 0) {
-			printf("Incorrect offset: %" PRIu64 "\n", ph.p_offset);
-			return 1;
-		}
 	
 		// Segment not loadable
 		if (ph.p_type != 1) {
